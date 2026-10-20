@@ -400,3 +400,19 @@ describe("primary ability (@primaryMod)", () => {
 		assert.equal(simulate(main("primaryAttack"), unset).attack.max, 10); // 0 + 0 + (3 + 1) + 6
 	});
 });
+
+describe("keywords shown on the card", () => {
+	test("Weapon and Implement are not repeated as custom keywords: the system shows them from weaponType", () => {
+		for (const name of ["weaponBasic", "implementDice", "meleeRangedSame", "closeBurst"]) {
+			const s = main(name).system;
+			assert.equal(s.keywordsCustom, "", `${name}: ${s.keywordsCustom}`);
+			assert.notEqual(s.weaponType, "none", `${name}: the tool must still come from weaponType`);
+		}
+	});
+
+	test("keywords the system has no field for are still kept", () => {
+		// "Stance" has an effectType; an unknown one (Reaping, Rune, ...) must survive as a custom keyword
+		const item = convertPower(parsePower({ ...FIXTURES.weaponBasic, html: FIXTURES.weaponBasic.html.replace("<b>Weapon</b>", "<b>Weapon</b>, <b>Reaping</b>") }), { categories: CATEGORIES })[0];
+		assert.equal(item.system.keywordsCustom, "Reaping");
+	});
+});

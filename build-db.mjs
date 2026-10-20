@@ -78,6 +78,9 @@ function convertKeywords(keywords) {
 			damage.add(k);
 			if (k === "poison") effect.add("poison");
 		} else if (EFFECT_BY_LABEL.has(k)) effect.add(EFFECT_BY_LABEL.get(k));
+		// Weapon / Implement are not keywords of their own in the system: the card derives them from weaponType
+		// (Item#prepareData -> labels.toolType, translated). Writing them here too made them appear twice ("Arma, Marcial, Weapon").
+		else if (k === "weapon" || k === "implement") continue;
 		else custom.push(raw);
 	}
 	return { damage, effect, custom, sources };
