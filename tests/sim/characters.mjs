@@ -12,9 +12,15 @@ export const abilityMod = score => Math.floor((score - 10) / 2);
 const PHYSICAL_STRONG = { str: 20, con: 16, dex: 14, int: 12, wis: 18, cha: 8 };
 const MENTAL_STRONG = { str: 10, con: 12, dex: 14, int: 20, wis: 18, cha: 16 };
 
-const character = (name, level, scores, weapons) => ({
+/**
+ * @param {string} primary  The ability picked as primary on the Details tab. Each character's differs from its highest
+ *                          modifier (novice Wis +4 vs Str +5, caster Cha +3 vs Int +5, veteran Dex +2 vs Str +5),
+ *                          so "primary" and "highest" cannot be mistaken for each other.
+ */
+const character = (name, level, scores, primary, weapons) => ({
 	name,
 	level,
+	primary,
 	lvhalf: Math.floor(level / 2),
 	scores,
 	mods: Object.fromEntries(Object.entries(scores).map(([k, v]) => [k, abilityMod(v)])),
@@ -24,17 +30,17 @@ const character = (name, level, scores, weapons) => ({
 const weapon = (kind, { dice = [], profBonus = 0, profImpBonus = 0, enhance = 0, proficient = true }) => ({ kind, dice, profBonus, profImpBonus, enhance, proficient });
 
 export const CHARACTERS = [
-	character("Level 1 novice", 1, PHYSICAL_STRONG, {
+	character("Level 1 novice", 1, PHYSICAL_STRONG, "wis", {
 		melee: weapon("weapon", { dice: [{ numDice: 1, numFaces: 8 }], profBonus: 3, enhance: 1 }),
 		ranged: weapon("weapon", { dice: [{ numDice: 1, numFaces: 10 }], profBonus: 2, enhance: 2 }),
 		implement: weapon("implement", { profImpBonus: 1, enhance: 3 }),
 	}),
-	character("Level 11 caster", 11, MENTAL_STRONG, {
+	character("Level 11 caster", 11, MENTAL_STRONG, "cha", {
 		melee: weapon("weapon", { dice: [{ numDice: 1, numFaces: 4 }], profBonus: 2, enhance: 3 }),
 		ranged: weapon("weapon", { dice: [{ numDice: 1, numFaces: 8 }], profBonus: 3, enhance: 1 }),
 		implement: weapon("implement", { profImpBonus: 2, enhance: 4 }),
 	}),
-	character("Level 21 veteran", 21, PHYSICAL_STRONG, {
+	character("Level 21 veteran", 21, PHYSICAL_STRONG, "dex", {
 		melee: weapon("weapon", { dice: [{ numDice: 1, numFaces: 12 }], profBonus: 3, enhance: 5 }),
 		ranged: weapon("weapon", { dice: [{ numDice: 1, numFaces: 6 }], profBonus: 2, enhance: 4 }),
 		implement: weapon("implement", { profImpBonus: 2, enhance: 6 }),

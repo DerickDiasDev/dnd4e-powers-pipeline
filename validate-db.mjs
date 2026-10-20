@@ -31,7 +31,7 @@ const inEnum = (item, field, value, list, allowEmpty = false) => {
 };
 
 // Formula tokens the system defines in Item#getRollData / the actor roll data
-const FORMULA_OK = /^(?:\s|\d+(?:d\d+)?|\+|-|\*|\/|\(|\)|,|max|@(?:powBase|powMax|powerMod|wepDamage|wepCritBonus|wepAttack|lvhalf|abilities\.(?:str|con|dex|int|wis|cha)\.mod))+$/;
+const FORMULA_OK = /^(?:\s|\d+(?:d\d+)?|\+|-|\*|\/|\(|\)|,|max|@(?:powBase|powMax|powerMod|wepDamage|wepCritBonus|wepAttack|lvhalf|maxMod|primaryMod|(?:str|con|dex|int|wis|cha)Mod|abilities\.(?:str|con|dex|int|wis|cha)\.mod))+$/;
 
 const ids = new Set();
 const idSet = new Set(items.map(i => i._id));

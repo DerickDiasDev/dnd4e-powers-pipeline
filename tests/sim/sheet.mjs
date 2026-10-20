@@ -104,6 +104,10 @@ export function simulate(item, character) {
 		powerMod: ABILITY_KEYS.includes(s.attack.ability) ? character.mods[s.attack.ability] : 0,
 		wepAttack: w.wepAttack,
 		wepDamage: w.wepDamage,
+		// Actor#getRollData: <ability>Mod, maxMod (the largest of the six) and primaryMod (the ability picked on the Details tab, 0 when unset)
+		maxMod: Math.max(...ABILITY_KEYS.map(k => character.mods[k])),
+		primaryMod: character.primary ? character.mods[character.primary] : 0,
+		...Object.fromEntries(ABILITY_KEYS.map(k => [`${k}Mod`, character.mods[k]])),
 		...Object.fromEntries(ABILITY_KEYS.map(k => [`abilities.${k}.mod`, character.mods[k]])),
 	};
 

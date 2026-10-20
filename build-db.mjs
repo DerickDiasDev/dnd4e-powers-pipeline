@@ -132,17 +132,29 @@ function convertRange(range, keywords, { needsWeapon = false } = {}) {
 /*  Damage                                      */
 /* -------------------------------------------- */
 
-/** One mod term (e.g. "wis" or "str|dex") as a roll-data reference. */
 /**
- * "Your highest ability modifier" (Rules Compendium wording used by powers): the largest modifier of the character.
+ * Symbolic abilities in the book text, written with the dnd4e system's own roll variables (Actor#getRollData):
+ *  - "highest ability modifier"          -> @maxMod, the largest of the six (already defined by the system)
+ *  - "highest mental/physical ability"   -> max() over those three modifiers (@intMod, @wisMod, @chaMod / @strMod, @dexMod, @conMod)
+ *  - "primary ability"                   -> @primaryMod, the ability the player picks on the Details tab
  * The mental set is Intelligence, Wisdom and Charisma; the physical set is Strength, Dexterity and Constitution.
- * Expressed with Foundry's max() so the sheet recalculates it from the live ability scores.
  */
 const HIGHEST_SETS = { highest: ["str", "con", "dex", "int", "wis", "cha"], "highest-mental": ["int", "wis", "cha"], "highest-physical": ["str", "dex", "con"] };
-export const highestTerm = token => `max(${HIGHEST_SETS[token].map(k => `@abilities.${k}.mod`).join(", ")})`;
+export const highestTerm = token => (token === "highest" ? "@maxMod" : `max(${HIGHEST_SETS[token].map(k => `@${k}Mod`).join(", ")})`);
+export const PRIMARY_TERM = "@primaryMod";
 
-function modTerm(mod, attackAbility, review) {
+/**
+ * One mod term (e.g. "wis" or "str|dex") as a roll-data reference.
+ * @param {string} mod              A modifier token from the parser.
+ * @param {string} attackAbility    The attack's ability key, or "" when the attack has none.
+ * @param {string[]} review         Review notes, appended to.
+ * @param {string|null} attackSymbol  The attack's first ability token ("primary", "highest", "str", ...).
+ */
+function modTerm(mod, attackAbility, review, attackSymbol = null) {
 	if (mod in HIGHEST_SETS) return highestTerm(mod);
+	if (mod === "primary") return PRIMARY_TERM;
+	// A bare "ability modifier" in a power whose attack is "Primary ability" means that same ability (true of all 82 such powers).
+	if (mod === "ability" && attackSymbol === "primary") return PRIMARY_TERM;
 	const opts = mod.split("|");
 	if (!opts.every(o => ABILS.has(o))) { review.push(`damage-mod:${mod}`); return "@powerMod"; }
 	const pick = opts.includes(attackAbility) ? attackAbility : opts[0];
@@ -150,7 +162,7 @@ function modTerm(mod, attackAbility, review) {
 	return pick === attackAbility ? "@powerMod" : `@abilities.${pick}.mod`;
 }
 
-function convertDamage(d, attackAbility, usesEquipment, review) {
+function convertDamage(d, attackAbility, usesEquipment, review, attackSymbol = null) {
 	const terms = [];
 	const critTerms = [];
 	let baseQuantity = "0";
@@ -164,7 +176,7 @@ function convertDamage(d, attackAbility, usesEquipment, review) {
 	const usedFlatAsBase = baseDiceType === "flat" && baseQuantity !== "0";
 	for (const x of dice) { terms.push(`${x.count}d${x.faces}`); critTerms.push(String(x.count * x.faces)); }
 	if (d.flat > 0 && !usedFlatAsBase) { terms.push(String(d.flat)); critTerms.push(String(d.flat)); }
-	const mods = d.mods.map(m => modTerm(m, attackAbility, review));
+	const mods = d.mods.map(m => modTerm(m, attackAbility, review, attackSymbol));
 	const wep = usesEquipment ? ["@wepDamage"] : [];
 	const formula = ["@powBase", ...terms, ...mods, ...wep].join(" + ");
 	const critFormula = ["@powMax", ...critTerms, ...mods, ...wep, ...(usesEquipment ? ["@wepCritBonus"] : [])].join(" + ");
@@ -194,9 +206,11 @@ export function convertSection(p, base, ctx) {
 	const attackSource = variant && p.attack?.alternatives ? { ...p.attack, ...p.attack.alternatives.find(a => a.when === variant) } : p.attack;
 	const atk = attackSource?.parsed ? attackSource : null;
 	const attackAbility = atk && ABILS.has(atk.abilities[0]) ? atk.abilities[0] : "";
-	// "Highest ability": no single ability fits attack.ability, so the attack formula carries the max() itself.
-	const attackHighest = atk && atk.abilities[0] in HIGHEST_SETS ? atk.abilities[0] : null;
-	if (atk && !attackAbility && !attackHighest) review.push(`attack-ability:${atk.abilities.join("|")}`);
+	// "Highest ability" and "primary ability": no single fixed ability fits attack.ability, so the attack formula carries the term itself.
+	const attackSymbol = atk?.abilities[0] ?? null;
+	const attackHighest = atk && attackSymbol in HIGHEST_SETS ? attackSymbol : null;
+	const attackPrimary = attackSymbol === "primary";
+	if (atk && !attackAbility && !attackHighest && !attackPrimary) review.push(`attack-ability:${atk.abilities.join("|")}`);
 	if (atk && atk.abilities.length > 1) review.push(`attack-ability-choice:${atk.abilities.join("|")}`);
 	if (atk && atk.defences.length > 1) review.push("attack-multiple-defences");
 
@@ -219,7 +233,7 @@ export function convertSection(p, base, ctx) {
 	const needsWeapon = (primary?.weapon ?? 0) > 0;
 	if (needsWeapon) usesEquipment = true;
 	if (primary) {
-		dmg = convertDamage(primary, attackAbility, usesEquipment, review);
+		dmg = convertDamage(primary, attackAbility, usesEquipment, review, attackSymbol);
 		const explicit = primary.types ?? [];
 		const inferred = primary.typesFromKeywords ?? [];
 		damageKeys = (explicit.length ? explicit : inferred).filter(t => DAMAGE_KEYS.has(t));
@@ -296,7 +310,9 @@ export function convertSection(p, base, ctx) {
 			def: atk ? atk.defences[0] : "ac",
 			detail: atk?.text ?? "",
 			// attack.abilityBonus exists in the schema but nothing reads it; the roll uses attack.formula only.
-			...(atk && (atk.bonus || attackHighest) ? { formula: `@wepAttack + ${attackHighest ? highestTerm(attackHighest) : "@powerMod"} + @lvhalf${atk.bonus ? ` + ${atk.bonus}` : ""}` } : {}),
+			...(atk && (atk.bonus || attackHighest || attackPrimary)
+				? { formula: `@wepAttack + ${attackHighest ? highestTerm(attackHighest) : attackPrimary ? PRIMARY_TERM : "@powerMod"} + @lvhalf${atk.bonus ? ` + ${atk.bonus}` : ""}` }
+				: {}),
 		},
 		hit: {
 			isDamage: Boolean(primary),

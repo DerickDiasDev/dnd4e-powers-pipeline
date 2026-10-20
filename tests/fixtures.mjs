@@ -178,6 +178,22 @@ export const FIXTURES = {
 		name: "Test Brawn Over", blocks: [["Target", "One creature"], ["Attack", "Highest physical ability + 2 vs. AC"], ["Hit", "1[W] + highest physical ability modifier damage."]],
 	}),
 
+	// "Primary ability": the ability the character picked on the Details tab (@primaryMod). A bare "ability modifier" in the
+	// damage of such a power means the same ability.
+	primaryAttack: entry("t-primary", {
+		name: "Test Primal Gift", usage: "Encounter",
+		blocks: [["Target", "One creature"], ["Attack", "Primary ability + 6 vs. Reflex"], ["Hit", "2[W] + ability modifier damage."]],
+	}),
+	primaryNamed: entry("t-primary-named", {
+		name: "Test Primal Gift Named", usage: "Encounter",
+		blocks: [["Target", "One creature"], ["Attack", "Primary ability vs. Will"], ["Hit", "1[W] + primary ability modifier damage."]],
+	}),
+	// A bare "ability modifier" with a normal attack is ambiguous: kept as a review note, not guessed
+	abilityAmbiguous: entry("t-ability-ambiguous", {
+		name: "Test Ambiguous", usage: "Encounter",
+		blocks: [["Target", "One creature"], ["Attack", "Strength vs. AC"], ["Hit", "1[W] + ability modifier damage."]],
+	}),
+
 	bareAbility: entry("t-bare", {
 		name: "Test Bare", keywords: ["Martial", "Weapon"],
 		blocks: [["Target", "One creature"], ["Attack", "Strength vs. AC"], ["Hit", "2[W] + Strength damage."]],

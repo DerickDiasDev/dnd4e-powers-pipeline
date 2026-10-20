@@ -300,9 +300,10 @@ describe("converter: classification and text", () => {
 });
 
 describe("highest ability modifier (all six / mental / physical)", () => {
-	const MAX_ALL = "max(@abilities.str.mod, @abilities.con.mod, @abilities.dex.mod, @abilities.int.mod, @abilities.wis.mod, @abilities.cha.mod)";
-	const MAX_MENTAL = "max(@abilities.int.mod, @abilities.wis.mod, @abilities.cha.mod)";
-	const MAX_PHYSICAL = "max(@abilities.str.mod, @abilities.dex.mod, @abilities.con.mod)";
+	// The system already defines @maxMod (Actor#getRollData); the mental/physical sets use max() over its <ability>Mod variables.
+	const MAX_ALL = "@maxMod";
+	const MAX_MENTAL = "max(@intMod, @wisMod, @chaMod)";
+	const MAX_PHYSICAL = "max(@strMod, @dexMod, @conMod)";
 	const [novice, caster] = CHARACTERS; // novice: Str +5 is the top modifier. caster: Int +5 is the top modifier, physical best is Dex +2.
 
 	test("the parser keeps the three sets apart", () => {
@@ -314,7 +315,7 @@ describe("highest ability modifier (all six / mental / physical)", () => {
 		assert.equal(parse("highestAll").quality, "full");
 	});
 
-	test("the converter writes max() over the right abilities, in the attack and in the damage", () => {
+	test("the converter writes @maxMod or max() over the right abilities, in the attack and in the damage", () => {
 		const all = main("highestAll").system;
 		assert.equal(all.attack.formula, `@wepAttack + ${MAX_ALL} + @lvhalf`);
 		assert.equal(all.attack.ability, "");
@@ -347,5 +348,55 @@ describe("highest ability modifier (all six / mental / physical)", () => {
 		// melee weapon, +2 fixed: novice 0 + 5 + (3 + 1) + 2 = 11; caster 5 + 2 + (2 + 3) + 2 = 14
 		assert.equal(simulate(item, novice).attack.max, 11);
 		assert.equal(simulate(item, caster).attack.max, 14);
+	});
+});
+
+describe("primary ability (@primaryMod)", () => {
+	const [novice, caster, veteran] = CHARACTERS; // primary abilities: novice Wis +4, caster Cha +3, veteran Dex +2
+
+	test("the parser reads the attack and the bare 'ability modifier'", () => {
+		const p = parse("primaryAttack");
+		assert.equal(p.attack.abilities[0], "primary");
+		assert.equal(p.attack.bonus, 6);
+		assert.deepEqual(p.hit.damage[0].mods, ["ability"]);
+		assert.deepEqual(parse("primaryNamed").hit.damage[0].mods, ["primary"]);
+		assert.equal(p.quality, "full");
+	});
+
+	test("attack and damage both use @primaryMod, and nothing is left to review", () => {
+		const i = main("primaryAttack");
+		assert.equal(i.system.attack.formula, "@wepAttack + @primaryMod + @lvhalf + 6");
+		assert.equal(i.system.attack.ability, "");
+		assert.equal(i.system.hit.formula, "@powBase + @primaryMod + @wepDamage");
+		assert.equal(i.system.hit.critFormula, "@powMax + @primaryMod + @wepDamage + @wepCritBonus");
+		assert.equal(i.flags.dnd4e.import.review.length, 0);
+		assert.equal(main("primaryNamed").system.hit.formula, "@powBase + @primaryMod + @wepDamage");
+	});
+
+	test("a bare 'ability modifier' next to an ordinary attack is not guessed", () => {
+		const i = main("abilityAmbiguous");
+		assert.ok(i.flags.dnd4e.import.review.includes("damage-mod:ability"));
+		assert.doesNotMatch(i.system.hit.formula, /@primaryMod/);
+	});
+
+	// Worked by hand. Melee weapon: novice d8 prof 3 enh 1; caster d4 prof 2 enh 3; veteran d12 prof 3 enh 5.
+	test("attack: half level + primary modifier + weapon + 6", () => {
+		const item = main("primaryAttack");
+		assert.equal(simulate(item, novice).attack.max, 14); // 0 + 4 + (3 + 1) + 6
+		assert.equal(simulate(item, caster).attack.max, 19); // 5 + 3 + (2 + 3) + 6
+		assert.equal(simulate(item, veteran).attack.max, 26); // 10 + 2 + (3 + 5) + 6
+	});
+
+	test("damage: 2[W] + primary modifier + enhancement", () => {
+		const item = main("primaryAttack");
+		const range = c => [simulate(item, c).damage.min, simulate(item, c).damage.max];
+		assert.deepEqual(range(novice), [7, 21]); // 2d8 + 4 + 1
+		assert.deepEqual(range(caster), [8, 14]); // 2d4 + 3 + 3
+		assert.deepEqual(range(veteran), [9, 31]); // 2d12 + 2 + 5
+	});
+
+	test("a character with no primary ability set counts it as +0 (the sheet warns)", () => {
+		const unset = { ...novice, primary: "" };
+		assert.equal(simulate(main("primaryAttack"), unset).attack.max, 10); // 0 + 0 + (3 + 1) + 6
 	});
 });

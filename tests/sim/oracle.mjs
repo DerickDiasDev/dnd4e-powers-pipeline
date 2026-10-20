@@ -52,12 +52,13 @@ export function expected(parsed, flags, weaponType, character) {
 	// A melee/ranged side has abilities and defences but no `parsed` flag of its own.
 	const attack = side?.parsed || side?.abilities?.length ? side : null;
 	const attackAbility = attack ? attack.abilities[0] : null;
-	if (attack && !ABILITIES.includes(attackAbility) && !(attackAbility in HIGHEST)) return { skip: `symbolic attack ability "${attackAbility}"` };
+	if (attack && !ABILITIES.includes(attackAbility) && !(attackAbility in HIGHEST) && attackAbility !== "primary") return { skip: `symbolic attack ability "${attackAbility}"` };
 
 	let attackResult = null;
 	if (attack) {
 		const equipment = usesEquipment && weapon ? ((weapon.kind === "implement" ? weapon.profImpBonus : weapon.profBonus) * (weapon.proficient ? 1 : 0)) + weapon.enhance : 0;
-		const abilityMod = attackAbility in HIGHEST ? highestOf(attackAbility, character) : character.mods[attackAbility];
+		const abilityMod = attackAbility === "primary" ? character.mods[character.primary]
+			: attackAbility in HIGHEST ? highestOf(attackAbility, character) : character.mods[attackAbility];
 		const value = character.lvhalf + abilityMod + equipment + (attack.bonus ?? 0);
 		attackResult = { min: value, max: value };
 	}
@@ -68,6 +69,8 @@ export function expected(parsed, flags, weaponType, character) {
 	let modTotal = 0;
 	for (const mod of d.mods) {
 		if (mod in HIGHEST) { modTotal += highestOf(mod, character); continue; }
+		// "Primary ability modifier", and a bare "ability modifier" in a power whose attack is "Primary ability" (the same ability).
+		if (mod === "primary" || (mod === "ability" && attackAbility === "primary")) { modTotal += character.mods[character.primary]; continue; }
 		const options = mod.split("|");
 		if (!options.every(o => ABILITIES.includes(o))) return { skip: `symbolic damage modifier "${mod}"` };
 		modTotal += character.mods[options.includes(attackAbility) ? attackAbility : options[0]];
