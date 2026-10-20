@@ -42,6 +42,15 @@ describe("observed in Foundry", () => {
 		assert.equal(power.system.hit.critFormula, "@powMax + @primaryMod + @wepDamage + @wepCritBonus");
 	});
 
+	// Observed attack rolls on the same sheet: "d20 + 11" with Strength as primary, "d20 + 7" with the field empty.
+	test("attack with Strength as primary: observed d20 + 11", () => {
+		assert.equal(simulate(power, fighter).attack.max, 11); // 3 (half level) + 4 (Str) + 3 (proficiency) + 1 (enhancement)
+	});
+
+	test("attack with no primary ability chosen: observed d20 + 7 (the primary modifier counts as 0)", () => {
+		assert.equal(simulate(power, { ...fighter, primary: "" }).attack.max, 7); // 3 + 0 + 3 + 1
+	});
+
 	test("normal damage and the attack bonus follow from the same terms", () => {
 		const { damage, attack } = simulate(power, fighter);
 		assert.deepEqual([damage.min, damage.max], [9, 37]); // 4d8 + 4 + 1
