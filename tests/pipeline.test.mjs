@@ -416,3 +416,73 @@ describe("keywords shown on the card", () => {
 		assert.equal(item.system.keywordsCustom, "Reaping");
 	});
 });
+
+describe("a power that lets the player choose the ability: one version per ability", () => {
+	const [novice] = CHARACTERS; // Str +5, Wis +4; melee weapon d8 (proficiency 3, enhancement 1)
+	const notes = item => item.flags.dnd4e.import.review;
+
+	test("attack and damage choose the same set: one item per ability, each using its own", () => {
+		const items = convert("choiceLinked");
+		assert.deepEqual(items.map(i => i.name), ["Test Pick (Strength)", "Test Pick (Wisdom)"]);
+		assert.deepEqual(items.map(i => i.flags.dnd4e.import.ability), ["str", "wis"]);
+		assert.deepEqual(items.map(i => i.flags.dnd4e.import.role), ["main", "variant"]);
+		assert.deepEqual(items.map(i => i.system.attack.ability), ["str", "wis"]);
+		for (const i of items) assert.equal(i.system.hit.formula, "@powBase + @powerMod + @wepDamage", "the damage follows the version's attack ability");
+		assert.equal(new Set(items.map(i => i._id)).size, 2);
+		assert.equal(new Set(items.map(i => i.system.identifier)).size, 2);
+		assert.equal(items[1].flags.dnd4e.import.bundle, items[0]._id);
+	});
+
+	test("the choice is no longer a warning: the versions are a note that says so", () => {
+		for (const i of convert("choiceLinked")) {
+			assert.ok(notes(i).includes("ability-versions:str|wis"), notes(i).join());
+			assert.equal(notes(i).some(n => n.startsWith("attack-ability-choice") || n.startsWith("damage-ability-choice")), false);
+		}
+	});
+
+	test("numbers: each version rolls with its own ability", () => {
+		const [strength, wisdom] = convert("choiceLinked");
+		assert.equal(simulate(strength, novice).attack.max, 9); // 0 + Str 5 + (3 + 1)
+		assert.equal(simulate(wisdom, novice).attack.max, 8); // 0 + Wis 4 + (3 + 1)
+		assert.deepEqual([simulate(strength, novice).damage.min, simulate(strength, novice).damage.max], [7, 14]); // 1d8 + 5 + 1
+		assert.deepEqual([simulate(wisdom, novice).damage.min, simulate(wisdom, novice).damage.max], [6, 13]); // 1d8 + 4 + 1
+	});
+
+	test("only the attack chooses: three versions, the fixed damage modifier is the same in all", () => {
+		const items = convert("choiceAttackOnly");
+		assert.deepEqual(items.map(i => i.name), ["Test Mind Pick (Intelligence)", "Test Mind Pick (Wisdom)", "Test Mind Pick (Charisma)"]);
+		assert.deepEqual(items.map(i => i.system.attack.ability), ["int", "wis", "cha"]);
+		for (const i of items) assert.equal(i.system.hit.formula, "@powBase + @abilities.str.mod + @wepDamage");
+	});
+
+	test("only the damage chooses: the attack ability is fixed, the damage modifier is the chosen one", () => {
+		const items = convert("choiceDamageOnly");
+		assert.deepEqual(items.map(i => i.name), ["Test Damage Pick (Strength)", "Test Damage Pick (Dexterity)", "Test Damage Pick (Constitution)"]);
+		assert.deepEqual(items.map(i => i.system.attack.ability), ["str", "str", "str"]);
+		assert.deepEqual(items.map(i => i.system.hit.formula), [
+			"@powBase + @powerMod + @wepDamage", "@powBase + @abilities.dex.mod + @wepDamage", "@powBase + @abilities.con.mod + @wepDamage",
+		]);
+	});
+
+	test("melee/ranged and ability choice together: a version for each combination that exists", () => {
+		const items = convert("choiceAndSplit");
+		assert.deepEqual(items.map(i => i.name), ["Test Both (Melee, Strength)", "Test Both (Melee, Dexterity)", "Test Both (Ranged)"]);
+		assert.deepEqual(items.map(i => i.system.weaponType), ["melee", "melee", "ranged"]);
+		assert.deepEqual(items.map(i => i.flags.dnd4e.import.ability), ["str", "dex", undefined], "the ranged side offers no choice");
+		assert.deepEqual(items.map(i => i.system.attack.ability), ["str", "dex", "dex"]);
+		assert.equal(new Set(items.map(i => i._id)).size, 3);
+	});
+
+	test("a power without a choice is one item, as before", () => {
+		for (const name of ["weaponBasic", "implementDice", "closeBurst"]) assert.equal(convert(name).length, 1, name);
+		assert.equal(convert("meleeRangedSplit").length, 2, "melee/ranged alone is still two");
+	});
+
+	test("ids of the melee/ranged versions do not change", () => {
+		// the main item keeps the id of the power; the ranged one keeps the "ranged" id, so republishing does not orphan imported items
+		const [melee, ranged] = convert("meleeRangedSplit");
+		assert.match(melee._id, /^[A-Za-z0-9]{16}$/);
+		assert.deepEqual(convert("meleeRangedSplit").map(i => i._id), [melee._id, ranged._id]);
+		assert.equal(ranged.flags.dnd4e.import.ability, undefined);
+	});
+});

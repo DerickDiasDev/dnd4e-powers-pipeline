@@ -51,7 +51,9 @@ export function expected(parsed, flags, weaponType, character) {
 	const side = variant && section.attack?.alternatives ? section.attack.alternatives.find(a => a.when === variant) : section.attack;
 	// A melee/ranged side has abilities and defences but no `parsed` flag of its own.
 	const attack = side?.parsed || side?.abilities?.length ? side : null;
-	const attackAbility = attack ? attack.abilities[0] : null;
+	// A power that lets the player choose the ability is imported once per ability; this version stands for `chosen`.
+	const chosen = flags.ability ?? null;
+	const attackAbility = attack ? (chosen && attack.abilities.includes(chosen) ? chosen : attack.abilities[0]) : null;
 	if (attack && !ABILITIES.includes(attackAbility) && !(attackAbility in HIGHEST) && attackAbility !== "primary") return { skip: `symbolic attack ability "${attackAbility}"` };
 
 	let attackResult = null;
@@ -73,7 +75,7 @@ export function expected(parsed, flags, weaponType, character) {
 		if (mod === "primary" || (mod === "ability" && attackAbility === "primary")) { modTotal += character.mods[character.primary]; continue; }
 		const options = mod.split("|");
 		if (!options.every(o => ABILITIES.includes(o))) return { skip: `symbolic damage modifier "${mod}"` };
-		modTotal += character.mods[options.includes(attackAbility) ? attackAbility : options[0]];
+		modTotal += character.mods[chosen && options.includes(chosen) ? chosen : (options.includes(attackAbility) ? attackAbility : options[0])];
 	}
 
 	const enhance = usesEquipment && weapon ? weapon.enhance : 0;

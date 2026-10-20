@@ -30,11 +30,14 @@ The index lists **one row per power**. Importing a row imports every item in its
 | `flags.dnd4e.import.role` | what it is |
 |---|---|
 | `main` | the power itself (the *melee* version when the power is split) |
-| `variant` | the *ranged* version of a split melee/ranged power |
+| `variant` | every other version of the power: the *ranged* version of a melee/ranged power, and one version per ability when the player chooses the ability |
 | `child` | an extra part of the power (secondary attack, second technique, ...) |
 
 All members share `import.bundle` (the main item's `_id`). A power is split into "Name (Melee)" / "Name (Ranged)" only when the attack or the damage differs between the two
 (47 powers, e.g. `Strength vs. AC (melee) or Dexterity vs. AC (ranged)`); the ~190 powers with the same stats for both use one item with `weaponType: meleeRanged`.
+
+### Choice of ability
+When the text lets the player choose the ability ("Strength or Wisdom vs. AC", or a fixed attack with "+ Strength, Dexterity, or Constitution damage"), the power imports one version per ability: "Name (Strength)", "Name (Wisdom)". Each version has its own attack ability and damage modifier, `flags.dnd4e.import.ability`, and a note `ability-versions`. In the current data this is 185 powers with 2 or 3 options (233 extra items). The index row lists them in `abilities`. A melee/ranged power with a choice on one side gets a version per combination that exists ("Name (Melee, Strength)", "Name (Melee, Dexterity)", "Name (Ranged)").
 
 `flags.dnd4e.import` also holds what PowerData cannot express yet: `review` notes, `extraDamage`, `ongoing`, `scaling`, and `candidates` (conditions, resistances, forced movement) for a future ActiveEffect pass.
 

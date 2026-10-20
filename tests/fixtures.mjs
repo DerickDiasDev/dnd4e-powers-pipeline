@@ -194,6 +194,29 @@ export const FIXTURES = {
 		blocks: [["Target", "One creature"], ["Attack", "Strength vs. AC"], ["Hit", "1[W] + ability modifier damage."]],
 	}),
 
+	// The player chooses the ability: one version per ability. Attack and damage choose the same set ...
+	choiceLinked: entry("t-choice-linked", {
+		name: "Test Pick", blocks: [["Target", "One creature"], ["Attack", "Strength or Wisdom vs. AC"], ["Hit", "1[W] + Strength or Wisdom modifier damage."]],
+	}),
+	// ... or only the attack chooses (the damage modifier is fixed) ...
+	choiceAttackOnly: entry("t-choice-attack", {
+		name: "Test Mind Pick", cls: "Wizard", keywords: ["Arcane", "Implement"], range: "<b>Ranged</b> 10",
+		blocks: [["Target", "One creature"], ["Attack", "Intelligence, Wisdom, or Charisma vs. Will"], ["Hit", "2d6 + Strength modifier damage."]],
+	}),
+	// ... or only the damage chooses (the attack is fixed)
+	choiceDamageOnly: entry("t-choice-damage", {
+		name: "Test Damage Pick", blocks: [["Target", "One creature"], ["Attack", "Strength vs. AC"], ["Hit", "2[W] + Strength, Dexterity, or Constitution damage."]],
+	}),
+	// A melee/ranged power where only the melee side lets the player choose
+	choiceAndSplit: entry("t-choice-split", {
+		name: "Test Both", range: "<b>Melee or Ranged</b> weapon",
+		blocks: [
+			["Target", "One creature"],
+			["Attack", "Strength or Dexterity vs. AC (melee) or Dexterity vs. AC (ranged)"],
+			["Hit", "1[W] + Strength or Dexterity modifier damage (melee) or 1[W] + Dexterity modifier damage (ranged)."],
+		],
+	}),
+
 	bareAbility: entry("t-bare", {
 		name: "Test Bare", keywords: ["Martial", "Weapon"],
 		blocks: [["Target", "One creature"], ["Attack", "Strength vs. AC"], ["Hit", "2[W] + Strength damage."]],

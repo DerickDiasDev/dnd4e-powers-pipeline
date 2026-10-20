@@ -153,20 +153,23 @@ export const PRIMARY_TERM = "@primaryMod";
  * @param {string} attackAbility    The attack's ability key, or "" when the attack has none.
  * @param {string[]} review         Review notes, appended to.
  * @param {string|null} attackSymbol  The attack's first ability token ("primary", "highest", "str", ...).
+ * @param {string|null} chosen      The ability of this version of a power that lets the player choose ("Strength or Wisdom").
  */
-function modTerm(mod, attackAbility, review, attackSymbol = null) {
+function modTerm(mod, attackAbility, review, attackSymbol = null, chosen = null) {
 	if (mod in HIGHEST_SETS) return highestTerm(mod);
 	if (mod === "primary") return PRIMARY_TERM;
 	// A bare "ability modifier" in a power whose attack is "Primary ability" means that same ability (true of all 82 such powers).
 	if (mod === "ability" && attackSymbol === "primary") return PRIMARY_TERM;
 	const opts = mod.split("|");
 	if (!opts.every(o => ABILS.has(o))) { review.push(`damage-mod:${mod}`); return "@powerMod"; }
-	const pick = opts.includes(attackAbility) ? attackAbility : opts[0];
-	if (opts.length > 1) review.push(`damage-ability-choice:${mod}`);
+	// A version made for one ability of a choice uses that ability wherever the text offers it; otherwise the attack's ability, then the first.
+	const resolved = chosen !== null && opts.includes(chosen);
+	const pick = resolved ? chosen : (opts.includes(attackAbility) ? attackAbility : opts[0]);
+	if (opts.length > 1 && !resolved) review.push(`damage-ability-choice:${mod}`);
 	return pick === attackAbility ? "@powerMod" : `@abilities.${pick}.mod`;
 }
 
-function convertDamage(d, attackAbility, usesEquipment, review, attackSymbol = null) {
+function convertDamage(d, attackAbility, usesEquipment, review, attackSymbol = null, chosen = null) {
 	const terms = [];
 	const critTerms = [];
 	let baseQuantity = "0";
@@ -180,7 +183,7 @@ function convertDamage(d, attackAbility, usesEquipment, review, attackSymbol = n
 	const usedFlatAsBase = baseDiceType === "flat" && baseQuantity !== "0";
 	for (const x of dice) { terms.push(`${x.count}d${x.faces}`); critTerms.push(String(x.count * x.faces)); }
 	if (d.flat > 0 && !usedFlatAsBase) { terms.push(String(d.flat)); critTerms.push(String(d.flat)); }
-	const mods = d.mods.map(m => modTerm(m, attackAbility, review, attackSymbol));
+	const mods = d.mods.map(m => modTerm(m, attackAbility, review, attackSymbol, chosen));
 	const wep = usesEquipment ? ["@wepDamage"] : [];
 	const formula = ["@powBase", ...terms, ...mods, ...wep].join(" + ");
 	const critFormula = ["@powMax", ...critTerms, ...mods, ...wep, ...(usesEquipment ? ["@wepCritBonus"] : [])].join(" + ");
@@ -192,6 +195,24 @@ function convertDamage(d, attackAbility, usesEquipment, review, attackSymbol = n
 /* -------------------------------------------- */
 
 const REQUIRED_TEXT = (label, t) => (t ? `${label}: ${t}` : null);
+
+const ABILITY_LABELS = { str: "Strength", con: "Constitution", dex: "Dexterity", int: "Intelligence", wis: "Wisdom", cha: "Charisma" };
+
+/**
+ * Where a power's own damage roll lives, and which entry is its primary damage.
+ * Usually "Hit"; sometimes only in a "Hit (Defence)" variant or in "Effect". For a melee/ranged power, `variant` picks a side.
+ * @returns {{from: string, damages: object[], primary: object|null}}
+ */
+function findDamage(p, variant) {
+	const sources = [["hit", p.hit], ...(p.hitVariants ?? []).map(v => [`hit-variant:${v.label}`, v]), ["effect", p.effect]];
+	const [from, block] = sources.find(([, b]) => b?.damage?.some(d => !d.extra && !d.equalTo && !d.self)) ?? ["hit", p.hit];
+	const damages = block?.damage ?? [];
+	const candidates = damages.filter(d => !d.extra && !d.equalTo && !d.self);
+	const primary = (variant
+		? (candidates.find(d => d.when === variant) ?? candidates.find(d => !d.when))
+		: candidates.find(d => !d.when || d.when === "melee")) ?? null;
+	return { from, damages, primary };
+}
 
 /**
  * Converts one parsed power (or one of its children) to Item data.
@@ -209,25 +230,23 @@ export function convertSection(p, base, ctx) {
 	const variant = ctx.variant ?? null;
 	const attackSource = variant && p.attack?.alternatives ? { ...p.attack, ...p.attack.alternatives.find(a => a.when === variant) } : p.attack;
 	const atk = attackSource?.parsed ? attackSource : null;
-	const attackAbility = atk && ABILS.has(atk.abilities[0]) ? atk.abilities[0] : "";
+	// A power that lets the player choose the ability is converted once per ability; `chosen` is this version's ability.
+	const chosen = ctx.ability ?? null;
+	const attackChoice = chosen !== null && atk?.abilities.includes(chosen);
+	const attackAbility = attackChoice ? chosen : (atk && ABILS.has(atk.abilities[0]) ? atk.abilities[0] : "");
 	// "Highest ability" and "primary ability": no single fixed ability fits attack.ability, so the attack formula carries the term itself.
 	const attackSymbol = atk?.abilities[0] ?? null;
 	const attackHighest = atk && attackSymbol in HIGHEST_SETS ? attackSymbol : null;
 	const attackPrimary = attackSymbol === "primary";
 	if (atk && !attackAbility && !attackHighest && !attackPrimary) review.push(`attack-ability:${atk.abilities.join("|")}`);
-	if (atk && atk.abilities.length > 1) review.push(`attack-ability-choice:${atk.abilities.join("|")}`);
+	if (atk && atk.abilities.length > 1 && !attackChoice) review.push(`attack-ability-choice:${atk.abilities.join("|")}`);
+	if (chosen !== null) review.push(`ability-versions:${ctx.abilities.join("|")}`);
 	if (atk && atk.defences.length > 1) review.push("attack-multiple-defences");
 
 	// Damage: first plain entry of the hit (melee side when the power has a melee/ranged choice)
 	// Where the damage lives varies: usually "Hit", sometimes only in "Hit (Defence)" variants or in "Effect".
-	const damageSources = [["hit", p.hit], ...(p.hitVariants ?? []).map(v => [`hit-variant:${v.label}`, v]), ["effect", p.effect]];
-	const [damageFrom, damageBlock] = damageSources.find(([, b]) => b?.damage?.some(d => !d.extra && !d.equalTo && !d.self)) ?? ["hit", p.hit];
+	const { from: damageFrom, damages, primary } = findDamage(p, variant);
 	if (damageFrom !== "hit") review.push(`damage-from:${damageFrom}`);
-	const damages = damageBlock?.damage ?? [];
-	const candidates = damages.filter(d => !d.extra && !d.equalTo && !d.self);
-	const primary = (variant
-		? (candidates.find(d => d.when === variant) ?? candidates.find(d => !d.when))
-		: candidates.find(d => !d.when || d.when === "melee")) ?? null;
 	// When the power is split into melee/ranged items, the other side is its own item, not an alternative.
 	const alternatives = variant ? [] : damages.filter(d => d !== primary && d.when === "ranged");
 	const extraDamage = damages.filter(d => d !== primary && (variant ? !d.when : d.when !== "ranged"));
@@ -237,7 +256,7 @@ export function convertSection(p, base, ctx) {
 	const needsWeapon = (primary?.weapon ?? 0) > 0;
 	if (needsWeapon) usesEquipment = true;
 	if (primary) {
-		dmg = convertDamage(primary, attackAbility, usesEquipment, review, attackSymbol);
+		dmg = convertDamage(primary, attackAbility, usesEquipment, review, attackSymbol, chosen);
 		const explicit = primary.types ?? [];
 		const inferred = primary.typesFromKeywords ?? [];
 		damageKeys = (explicit.length ? explicit : inferred).filter(t => DAMAGE_KEYS.has(t));
@@ -329,7 +348,7 @@ export function convertSection(p, base, ctx) {
 		effect: { detail: p.effect?.text ?? "" },
 		description: { value: base.flavor ? `<p><em>${esc(base.flavor)}</em></p>` : "" },
 		source: { book: base.published?.book ?? "", page: base.published?.pages ?? "", custom: "", revision: 1 },
-		identifier: slug(`${p.name ?? base.name}${variant ? `-${variant}` : ""}`),
+		identifier: slug(`${p.name ?? base.name}${variant ? `-${variant}` : ""}${chosen ? `-${chosen}` : ""}`),
 	};
 
 	const flags = {
@@ -347,6 +366,7 @@ export function convertSection(p, base, ctx) {
 				// Which parsed section this item came from: null = the power itself, n = parsed.children[n].
 				section: ctx.role === "child" ? ctx.index - 1 : null,
 				...(variant ? { variant } : {}),
+				...(chosen !== null ? { ability: chosen } : {}),
 				...(alternatives.length ? { alternatives } : {}),
 				...(extraDamage.length ? { extraDamage } : {}),
 				...(p.hit?.ongoing?.length || p.effect?.ongoing?.length ? { ongoing: [...(p.hit?.ongoing ?? []), ...(p.effect?.ongoing ?? [])] } : {}),
@@ -363,7 +383,7 @@ export function convertSection(p, base, ctx) {
 
 	return {
 		_id: stableId(ctx.role === "main" ? base.id : `${base.id}:${ctx.index}`),
-		name: `${p.name ?? base.name}${variant ? ` (${variant === "melee" ? "Melee" : "Ranged"})` : ""}`,
+		name: `${p.name ?? base.name}${versionSuffix(variant, chosen)}`,
 		type: "power",
 		system,
 		flags,
@@ -377,18 +397,54 @@ export function needsVariantSplit(parsed) {
 }
 
 /**
+ * The abilities a power lets the player choose between ("Strength or Wisdom vs. AC", or "+ Strength, Dexterity, or Constitution
+ * damage" with a fixed attack), or null when it does not. In the data the choice has two or three options and the attack's and the
+ * damage's choices are always the same set, so one list covers both.
+ */
+export function choiceSetFor(parsed, variant) {
+	const sides = parsed.attack?.alternatives;
+	const side = sides ? (variant ? sides.find(a => a.when === variant) : sides[0]) : parsed.attack;
+	if (side?.abilities?.length > 1 && side.abilities.every(a => ABILS.has(a))) return [...side.abilities];
+	const { primary } = findDamage(parsed, variant);
+	const mod = primary?.mods.find(m => m.includes("|") && m.split("|").every(o => ABILS.has(o)));
+	return mod ? mod.split("|") : null;
+}
+
+/**
+ * Every version a power is imported as: melee/ranged, times one per ability of a choice. The first is the "main" item.
+ * @returns {{variant: "melee"|"ranged"|null, ability: string|null, abilities: string[]|null}[]}
+ */
+export function versionPlan(parsed) {
+	const sides = needsVariantSplit(parsed) ? ["melee", "ranged"] : [null];
+	return sides.flatMap(variant => {
+		const abilities = choiceSetFor(parsed, variant);
+		return (abilities ?? [null]).map(ability => ({ variant, ability, abilities }));
+	});
+}
+
+/** " (Melee, Strength)" for a version, "" for a power with a single version. */
+function versionSuffix(variant, ability) {
+	const parts = [variant === "melee" ? "Melee" : variant === "ranged" ? "Ranged" : null, ability ? ABILITY_LABELS[ability] : null].filter(Boolean);
+	return parts.length ? ` (${parts.join(", ")})` : "";
+}
+
+/**
  * One parsed power -> the items to import together (a "bundle"):
- *   main      the power itself (the melee version when it is split)
- *   variant   the ranged version of a split melee/ranged power
+ *   main      the power itself (the first version: melee, and the first ability, when it is split)
+ *   variant   the other versions: ranged, and one per ability when the player chooses the ability
  *   child     extra parts of the power (secondary attack, second technique, ...)
  */
 export function convertPower(parsed, ctx) {
 	if (!parsed.usage && parsed.quality === "text") return [];
-	const split = needsVariantSplit(parsed);
-	const main = convertSection(parsed, parsed, { ...ctx, role: "main", variant: split ? "melee" : null, bundle: null, index: 0 });
+	const [first, ...others] = versionPlan(parsed);
+	const main = convertSection(parsed, parsed, { ...ctx, role: "main", variant: first.variant, ability: first.ability, abilities: first.abilities, bundle: null, index: 0 });
 	main.flags.dnd4e.import.bundle = main._id;
 	const items = [main];
-	if (split) items.push(convertSection(parsed, parsed, { ...ctx, role: "variant", variant: "ranged", bundle: main._id, index: "ranged" }));
+	for (const version of others) {
+		// The index keeps the ids of the melee/ranged variants of earlier builds ("ranged") and extends them for abilities ("ranged-wis").
+		const index = [version.variant, version.ability].filter(Boolean).join("-");
+		items.push(convertSection(parsed, parsed, { ...ctx, role: "variant", variant: version.variant, ability: version.ability, abilities: version.abilities, bundle: main._id, index }));
+	}
 	(parsed.children ?? []).forEach((child, i) => {
 		items.push(convertSection(child, parsed, { ...ctx, role: "child", variant: null, bundle: main._id, index: i + 1 }));
 	});
@@ -436,9 +492,11 @@ async function main() {
 			review: notes.length,
 			reviewLevel: reviewLevel(notes),
 			reviewNotes: notes,
-			// Importing a power imports every item in `items` (main + melee/ranged variant + children), in this order.
+			// Importing a power imports every item in `items` (main + its other versions + children), in this order.
 			items: items.map(i => i._id),
-			variants: items.filter(i => i.flags.dnd4e.import.variant).map(i => i.flags.dnd4e.import.variant),
+			// The melee/ranged versions, and the abilities the player can choose between (one version each), each listed once.
+			variants: [...new Set(items.filter(i => i.flags.dnd4e.import.variant).map(i => i.flags.dnd4e.import.variant))],
+			abilities: [...new Set(items.filter(i => i.flags.dnd4e.import.ability).map(i => i.flags.dnd4e.import.ability))],
 			children: items.filter(i => i.flags.dnd4e.import.role === "child").length,
 		});
 	}

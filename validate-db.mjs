@@ -79,7 +79,9 @@ for (const item of items) {
 	if (!["main", "variant", "child"].includes(imp.role)) fail(item, `import.role "${imp.role}" is not main/variant/child`);
 	if (!idSet.has(imp.bundle)) fail(item, "import.bundle id does not exist in the DB");
 	if (imp.role === "main" && imp.bundle !== item._id) fail(item, "main item must be its own bundle");
-	if (imp.role === "variant" && !["melee", "ranged"].includes(imp.variant)) fail(item, "variant item without melee/ranged");
+	if (imp.role === "variant" && !["melee", "ranged"].includes(imp.variant) && !ENUMS.abilities.includes(imp.ability)) fail(item, "variant item with neither melee/ranged nor an ability");
+	if (imp.variant !== undefined && !["melee", "ranged"].includes(imp.variant)) fail(item, "variant is not melee/ranged");
+	if (imp.ability !== undefined && !ENUMS.abilities.includes(imp.ability)) fail(item, "ability is not one of the six");
 }
 
 const quality = {};
@@ -100,7 +102,8 @@ else {
 		const list = row.items.map(id => byId.get(id));
 		const ok = list.every(Boolean) && list[0]?._id === row._id
 			&& list.every(i => i.flags.dnd4e.import.bundle === row._id)
-			&& JSON.stringify(row.variants) === JSON.stringify(list.filter(i => i.flags.dnd4e.import.variant).map(i => i.flags.dnd4e.import.variant));
+			&& JSON.stringify(row.variants) === JSON.stringify([...new Set(list.filter(i => i.flags.dnd4e.import.variant).map(i => i.flags.dnd4e.import.variant))])
+			&& JSON.stringify(row.abilities) === JSON.stringify([...new Set(list.filter(i => i.flags.dnd4e.import.ability).map(i => i.flags.dnd4e.import.ability))]);
 		if (!ok) { bad++; if (bad <= 3) console.log(`  index row inconsistent: ${row.name}`); }
 	}
 	if (bad) { console.log(`${bad} index rows inconsistent`); process.exitCode = 1; }

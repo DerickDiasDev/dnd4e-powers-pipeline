@@ -110,3 +110,39 @@ test("a melee/ranged power is listed once and imports both versions", { skip }, 
 	}
 	assert.equal(new Set(index.map(r => r.id)).size, index.length, "one index row per power");
 });
+
+test("a power that lets the player choose the ability has exactly one version per ability of its text", { skip }, async () => {
+	const { parsed, items } = await loadAll();
+	const index = JSON.parse(await readFile(indexFile, "utf8"));
+	const ABILITIES = new Set(["str", "con", "dex", "int", "wis", "cha"]);
+
+	// The set of abilities the text offers, worked out here from the parsed text (not from the converter).
+	function offered(power) {
+		const a = power.attack?.abilities;
+		if (a && a.length > 1 && a.every(x => ABILITIES.has(x))) return a;
+		for (const block of [power.hit, ...(power.hitVariants ?? []), power.effect]) {
+			const candidates = (block?.damage ?? []).filter(d => !d.extra && !d.equalTo && !d.self);
+			if (!candidates.length) continue;
+			const mod = candidates[0].mods.find(m => m.includes("|") && m.split("|").every(o => ABILITIES.has(o)));
+			return mod ? mod.split("|") : null;
+		}
+		return null;
+	}
+
+	const byId = new Map(items.map(i => [i._id, i]));
+	const problems = [];
+	let checked = 0;
+	for (const row of index) {
+		const power = parsed.get(row.id);
+		if (power.attack?.alternatives || row.variants.length) continue; // melee/ranged powers are covered by their own tests
+		const want = offered(power) ?? [];
+		checked += want.length ? 1 : 0;
+		if (JSON.stringify(row.abilities) !== JSON.stringify(want)) problems.push(`${row.name}: text offers [${want}], row has [${row.abilities}]`);
+		const versions = row.items.map(id => byId.get(id)).filter(i => i.flags.dnd4e.import.role !== "child");
+		if (versions.length !== Math.max(1, want.length)) problems.push(`${row.name}: ${versions.length} versions for ${want.length || 1} expected`);
+		if (want.length && JSON.stringify(versions.map(v => v.flags.dnd4e.import.ability)) !== JSON.stringify(want)) problems.push(`${row.name}: version abilities ${versions.map(v => v.flags.dnd4e.import.ability)} != ${want}`);
+		if (want.length && new Set(versions.map(v => v.name)).size !== versions.length) problems.push(`${row.name}: two versions share a name`);
+	}
+	assert.ok(checked > 150, `only ${checked} powers with a choice were checked`);
+	assert.equal(problems.length, 0, `${problems.length} problems:\n${problems.slice(0, 6).join("\n")}`);
+});
