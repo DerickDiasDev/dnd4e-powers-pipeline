@@ -1,0 +1,18 @@
+{
+  "name": "dnd4e-collector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Downloads the 4e compendium snapshot, parses it and builds the PowerData DB for the dnd4e system.",
+  "scripts": {
+    "collect": "node collect.mjs",
+    "parse": "node parse-powers.mjs",
+    "build": "node build-db.mjs",
+    "validate": "node validate-db.mjs",
+    "pipeline": "node parse-powers.mjs && node build-db.mjs && node validate-db.mjs",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "test:pipeline": "node --test tests/pipeline.test.mjs",
+    "test:sheet": "node --test tests/db-sim.test.mjs"
+  },
+  "engines": { "node": ">=18" }
+}
