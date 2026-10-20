@@ -18,6 +18,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENUMS, EFFECT_BY_LABEL, POWER_SOURCE_BY_LOWER } from "./system-enums.mjs";
+import { reviewLevel, reviewNotes } from "./review-notes.mjs";
 
 export const DB_SCHEMA_VERSION = 1;
 
@@ -427,10 +428,14 @@ async function main() {
 			for (const r of item.flags.dnd4e.import.review) { const k = r.split(":")[0]; stats.review[k] = (stats.review[k] ?? 0) + 1; }
 		}
 		const m = items[0];
+		// What was not (fully) automated, over the whole bundle, as structured notes the importer explains in the user's language.
+		const notes = reviewNotes(items, p.quality, p.unparsed);
 		index.push({
 			id: p.id, _id: m._id, name: p.name, class: p.class, powerType: m.system.powerType, level: m.system.level, kind: m.system.powerSubtype,
 			usage: m.system.useType, action: m.system.actionType, source: p.sourceCode, file: `${sourceFile}.json`, quality: p.quality,
-			review: m.flags.dnd4e.import.review.length,
+			review: notes.length,
+			reviewLevel: reviewLevel(notes),
+			reviewNotes: notes,
 			// Importing a power imports every item in `items` (main + melee/ranged variant + children), in this order.
 			items: items.map(i => i._id),
 			variants: items.filter(i => i.flags.dnd4e.import.variant).map(i => i.flags.dnd4e.import.variant),
