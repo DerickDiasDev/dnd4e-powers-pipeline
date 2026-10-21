@@ -14,7 +14,7 @@ A private pipeline that turns a snapshot of the D&D 4th Edition compendium into 
 | Feats, paragon paths, epic destinies, themes, backgrounds | 3,272 / 577 / 115 / 116 / 817 | `feature` items (paths and destinies: one per feature) |
 | Monsters | 5,329 | NPC actors with their powers, traits and effects |
 | Magic items | 3,245 | one item each, with its levels (tiers), enhancement bonus and price |
-| Mundane equipment | 172 | 183 `weapon`, `equipment` and `consumable` items (weapons, armour, shields, implements, ammunition) |
+| Mundane equipment | 481 | 492 `weapon`, `equipment`, `consumable` and `loot` items (weapons, armour incl. masterwork, shields, implements, ammunition, adventuring gear) |
 
 ## Quick start
 
@@ -100,12 +100,14 @@ Two page layouts exist (a table under a heading per kind of action; an older sta
 
 ## Mundane equipment
 
-Only the entries marked *Mundane* of the weapon, armour and implement tables (magic items are the next section). Each becomes an item the sheet understands:
+Every page that is not a magic item: the mundane weapons, armour and implements, plus the masterwork armour, the pact and improvised weapons, and the adventuring gear of the item table (magic items are the next section). Each becomes an item the sheet understands:
 
 - **Weapons** (`weapon`): `weaponType` (simple/military/superior, melee or ranged), `weaponBaseType` (so automatic proficiency finds it), hand, group, properties (Brutal keeps its number), `damageDice`, proficiency bonus and range. A double weapon is one entry with two items (`role: child` for the secondary end).
 - **Armour and shields** (`equipment`): the AC bonus, the base type (cloth, leather, hide, chain, scale, plate), check and speed penalties as the sheet expects them (negative, switched on). A shield gives its bonus to AC and Reflex. Barding is an item of type *other*.
 - **Implements** (`weapon` of type implement): the implement group as base type; the rules text of properties the system has no switch for (Accurate, Energized...) goes into the description.
 - **Ammunition** (`consumable` of type ammo) with the quantity of the pack.
+- **Masterwork armour** is armour with its minimum enhancement in the text; **improvised weapons** use the system's improvised types; **pact weapons** are named weapons.
+- **Adventuring gear** (`loot`): gear, components, food, services, instruments, vehicles, buildings and mounts, with price, weight and text; a mount keeps the creature's stat block as text.
 
 A name the installed system has no base type for (a few Dragon Magazine weapons) is imported with an empty base type and the info note `base-type-unknown`; the proficiency then follows the category only.
 
@@ -118,8 +120,6 @@ Every `mihead` page of the weapon, armour, implement and item tables. The title 
 - **Slot items** (head, neck, arms, hands, feet, waist, ring), **wondrous items** (equipment of type other, so they can be equipped) and **alternative rewards** (boons, gifts, secrets...) are `equipment`. Consumables are `consumable`; familiars, mounts, companions, lairs and item sets are `loot`.
 - **Effects:** plain standing bonuses in a Property section become transferring effects with `equippedRec`, so the system suppresses them while the item is not equipped. A property whose numbers change with the level, or that is conditional, stays in the text.
 - **Powers** stay in the description (their numbers change with the level); the item records their headings in `flags.dnd4e.import.powers`.
-
-Not yet: the masterwork armour, the pact weapons and the adventuring gear of the item table (they use the mundane page layout).
 
 ## Tests
 

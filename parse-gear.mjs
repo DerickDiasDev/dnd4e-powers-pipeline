@@ -73,7 +73,7 @@ export function listBlock(body, heading) {
 /** "Simple one-handed melee weapon" / "Superior double melee weapon" / "Superior two-handed weapon" / "Superior ". */
 export function parseWeaponHeader(line) {
 	const t = txt(line ?? "");
-	const m = t.match(/^(Simple|Military|Superior)\b\s*(one-handed|two-handed|double)?\s*(melee|ranged)?/i);
+	const m = t.match(/^(Simple|Military|Superior|Improvised)\b\s*(one-handed|two-handed|double)?\s*(melee|ranged)?/i);
 	if (!m) return null;
 	return { category: m[1].toLowerCase(), hands: m[2]?.toLowerCase().replace("-handed", "") ?? null, reach: m[3]?.toLowerCase() ?? null };
 }
@@ -88,7 +88,8 @@ const sourcesOf = listing => String(listing.SourceBook ?? "").split(",").map(s =
 
 const common = (entry, kind, published) => {
 	const sources = sourcesOf(entry.listing);
-	return { id: entry.id, name: txt(entry.listing.Name), kind, sources, sourceCode: sources[0] ?? null, published };
+	// "Masterwork", "Pact Weapon"; the improvised weapons and the adventuring gear print none, and are as mundane as the rest.
+	return { id: entry.id, name: txt(entry.listing.Name), kind, sources, sourceCode: sources[0] ?? null, published, rarity: entry.listing.Rarity || "Mundane" };
 };
 
 /** The free text between the stats and the "Properties" heading, which the compendium prints as a flavour paragraph. */
@@ -156,6 +157,8 @@ export function parseArmor(entry) {
 		weight: parseWeight(field(body, "Weight")),
 		price: parsePrice(field(body, "Cost")),
 		special: field(body, "Special"),
+		// Masterwork armour is made with at least this enhancement bonus.
+		minEnhancement: signed(field(body, "Minimum Enhancement Value")),
 		description,
 		notes: [],
 	};
@@ -191,7 +194,29 @@ export function parseImplement(entry) {
 	};
 }
 
+/** The adventuring gear of the item table: gear, mounts, vehicles, instruments, food, services and buildings. */
+export function parseItem(entry) {
+	const { body, published } = splitPublished(entry.html);
+	const type = txt(entry.listing.Type);
+	const heading = txt(body.match(/<h1 class=player>([\s\S]*?)<\/h1>/i)?.[1] ?? "");
+	const category = txt(entry.listing.Category);
+	const description = field(body, "Description") === null
+		// A mount has no description line: the stat block of the creature follows the price.
+		? txt(body.split(/<br>\s*<br>/i).slice(1).join("\n"))
+		: txt(body.match(/<b>\s*Description\s*<\/b>\s*:?\s*([\s\S]*)$/i)[1]);
+	const base = {
+		...common(entry, type === "Ammunition" ? "ammo" : "item", published),
+		price: parsePrice(field(body, "Price")) ?? parsePrice(entry.listing.Cost),
+		weight: parseWeight(field(body, "Weight")),
+		description, notes: [],
+	};
+	if (type === "Ammunition") return { ...base, quantity: Number(heading.match(/\((\d+)\)\s*$/)?.[1] ?? 1) };
+	return { ...base, itemType: category === "Lair" ? "Building" : type || "Gear", mount: type === "Mount" };
+}
+
 export const isMundane = entry => entry.listing.Rarity === "Mundane";
+/** Everything that is not a magic page: the mundane entries, masterwork armour, pact and improvised weapons, gear. */
+export const isPlain = entry => !/<h1 class=mihead/i.test(entry.html);
 
 async function main() {
 	const argv = process.argv.slice(2);
@@ -199,11 +224,12 @@ async function main() {
 	const here = path.dirname(fileURLToPath(import.meta.url));
 	const inDir = path.resolve(here, flag("in", "out"));
 	const outDir = path.resolve(here, flag("out", "out/parsed"));
-	const load = async name => JSON.parse(await readFile(path.join(inDir, `${name}.json`), "utf8")).filter(isMundane);
+	const load = async name => JSON.parse(await readFile(path.join(inDir, `${name}.json`), "utf8")).filter(isPlain);
 	const parsed = [
 		...(await load("weapon")).map(parseWeapon),
 		...(await load("armor")).map(parseArmor),
 		...(await load("implement")).map(parseImplement),
+		...(await load("item")).map(parseItem),
 	];
 	await mkdir(outDir, { recursive: true });
 	await writeFile(path.join(outDir, "gear.json"), JSON.stringify(parsed));
@@ -211,7 +237,7 @@ async function main() {
 	for (const g of parsed) byKind[g.kind] = (byKind[g.kind] ?? 0) + 1;
 	const notes = {};
 	for (const g of parsed) for (const n of g.notes) notes[n] = (notes[n] ?? 0) + 1;
-	console.log(`Gear: ${parsed.length} mundane entries`, byKind, "notes:", notes);
+	console.log(`Gear: ${parsed.length} entries`, byKind, "notes:", notes);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();

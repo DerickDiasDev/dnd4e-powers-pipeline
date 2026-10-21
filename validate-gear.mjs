@@ -56,7 +56,7 @@ export function validateGear(entries, index) {
 				if (a.type === "armour") {
 					inList(n, "armour subtype", a.subtype, ENUMS.equipmentTypesArmour);
 					inList(n, "armour base type", s.armourBaseType, ["", ...(ARMOUR_BASES[a.subtype] ?? [])]);
-					if (!(a.ac >= 0 && a.ac <= 12)) fail(n, "armour bonus is not plausible");
+					if (!(a.ac >= 0 && a.ac <= 16)) fail(n, "armour bonus is not plausible");
 				} else if (a.type === "arms") {
 					inList(n, "shield subtype", a.subtype, ["light", "heavy"]);
 					inList(n, "shield base type", s.shieldBaseType, ["light", "heavy"]);
@@ -67,7 +67,7 @@ export function validateGear(entries, index) {
 			} else if (item.type === "consumable") {
 				inList(n, "consumableType", s.consumableType, ENUMS.consumableTypes);
 				if (!(Number.isInteger(s.quantity) && s.quantity >= 1)) fail(n, "ammunition quantity is not a positive integer");
-			} else fail(n, `unexpected item type "${item.type}"`);
+			} else if (item.type !== "loot") fail(n, `unexpected item type "${item.type}"`);
 		}
 		const row = index.find(r => r.id === e.id);
 		if (!row) fail(n, "entry is not in the index");

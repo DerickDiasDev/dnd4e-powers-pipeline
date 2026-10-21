@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { listBlock, parseArmor, parseImplement, parsePrice, parseWeapon, parseWeaponHeader } from "../parse-gear.mjs";
+import { listBlock, parseArmor, parseImplement, parseItem, parsePrice, parseWeapon, parseWeaponHeader } from "../parse-gear.mjs";
 import { buildGear, indexRow } from "../build-gear.mjs";
 import { validateGear } from "../validate-gear.mjs";
 
@@ -172,6 +172,47 @@ describe("building", () => {
 		const errors = [...validateGear([e], [indexRow(e)]).keys()].join("\n");
 		assert.match(errors, /weaponType/);
 		assert.match(errors, /property/);
+	});
+});
+
+describe("masterwork armour, improvised and pact weapons, adventuring gear", () => {
+	const build = (...parsed) => buildGear(parsed);
+
+	test("masterwork armour keeps its minimum enhancement in the text and its own category", () => {
+		const a = parseArmor(entry("Zorb Hide", `<h1 class=player>Zorb Hide</h1><br><b>Description</b>: Tough.<br><b>AC Bonus</b>: +4<br><b>Minimum Enhancement Value</b>: +5<br><b>Check</b>: -1<br><b>Weight</b>: 25 lb.<b>Cost</b>: Special<br><b>Special</b>: +1 Fortitude<br><b>Type</b>: Hide<br>${published}`, { Type: "Hide", Rarity: "Masterwork" }));
+		assert.equal(a.minEnhancement, 5);
+		assert.equal(a.price, null);
+		const [e] = build(a);
+		assert.equal(e.category, "masterwork");
+		assert.equal(e.rarity, "Masterwork");
+		assert.equal(e.items[0].system.armourBaseType, "hide");
+		assert.match(e.items[0].system.description.value, /Minimum enhancement:<\/strong> \+5/);
+	});
+
+	test("an improvised weapon has the system's improvised type, no price and no missing-base note", () => {
+		const w = parseWeapon(entry("Any small melee", `<h1 class=player>Any small melee</h1><br>Improvised one-handed melee weapon<br>Cost: — gp<br><b>Damage</b>: 1d4<br>Weight: 1–5 lb.<br><br>Anything.`, { Type: "Improvised", Rarity: "" }));
+		const [e] = build(w);
+		assert.equal(e.items[0].system.weaponType, "improvM");
+		assert.equal(e.rarity, "Mundane");
+		assert.deepEqual(e.notes, []);
+		assert.equal(validateGear([e], [indexRow(e)]).size, 0);
+	});
+
+	test("adventuring gear is loot with its price and description; a mount keeps its stat block as text", () => {
+		const gear = parseItem(entry("Zorb Case", `<h1 class=player>Zorb Case</h1><br><b>Category</b>: <br><b>Price</b>: 40 gp <br><b>Weight</b>: 20 lb<br><b>Description</b>: A case.`, { Category: "Equipment", Type: "", Rarity: "" }));
+		const mount = parseItem(entry("Zorb Steed", `<h1 class=player>Zorb Steed</h1><br><b>Category</b>: Mount<br><b>Price</b>: 13,000 gp <br><br><h1 class=monster>Zorb Steed<br><span class=type>Large beast (mount)</span></h1> <p class=flavor><b>HP</b> 130</p>`, { Category: "Equipment", Type: "Mount", Rarity: "" }));
+		const [g, m] = build(gear, mount);
+		assert.deepEqual([g.items[0].type, g.category, g.items[0].system.price, g.items[0].system.weight], ["loot", "gear", 40, 20]);
+		assert.equal(m.category, "mount");
+		assert.match(m.items[0].system.description.value, /Large beast \(mount\)/);
+		assert.match(m.items[0].system.description.value, /HP 130/);
+		assert.equal(validateGear([g, m], [g, m].map(indexRow)).size, 0);
+	});
+
+	test("the ammunition of the item table is ammunition, sized by its title", () => {
+		const a = parseItem(entry("Zorb signal", `<h1 class=player>Zorb signal (5)</h1><br><b>Category</b>: Ammunition<br><b>Price</b>: 15 gp <br><b>Weight</b>: 5 lb<br><b>Description</b>: Lit.`, { Category: "Equipment", Type: "Ammunition", Rarity: "" }));
+		const [e] = build(a);
+		assert.deepEqual([e.items[0].type, e.items[0].system.quantity, e.category], ["consumable", 5, "ammo"]);
 	});
 });
 

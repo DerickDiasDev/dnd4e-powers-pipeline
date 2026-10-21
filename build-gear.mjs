@@ -8,6 +8,9 @@
  *                   bonus on AC and Reflex as the rules say) or barding (type "other").
  *   - implement  -> `weapon` item with weaponType "implement" and the implement group as its base type.
  *   - ammo       -> `consumable` item of type "ammo".
+ *   - item       -> `loot` item: adventuring gear, mounts, vehicles, instruments, services, buildings.
+ *
+ * Masterwork armour, pact weapons and improvised weapons come with the rest (their `rarity` says what they are).
  *
  * Output: out/db/gear/_index.json (light rows for the importer's list) and out/db/gear/gear.json (full entries with items).
  * Run after build-db.mjs, which resets manifest.json.
@@ -79,7 +82,8 @@ function propertyText(properties) {
 
 function weaponSystem(e) {
 	const ranged = e.reach === "ranged";
-	const type = e.category ? `${e.category}${ranged ? "R" : "M"}` : "other";
+	// The system calls the improvised weapon types improvM / improvR.
+	const type = e.category ? `${e.category === "improvised" ? "improv" : e.category}${ranged ? "R" : "M"}` : "other";
 	const properties = {}, brutal = e.properties.find(p => /^brutal\b/i.test(p.name));
 	for (const p of e.properties) {
 		const key = PROPERTY_KEYS[p.name.toLowerCase().replace(/\s*\d+$/, "")];
@@ -92,7 +96,7 @@ function weaponSystem(e) {
 		system: {
 			description: { value: paragraphs(e.description) + propertyText(e.properties) },
 			source: source(e),
-			weight: e.weight ?? 0, price: e.price ?? 0, rarity: "Mundane",
+			weight: e.weight ?? 0, price: e.price ?? 0, rarity: e.rarity ?? "Mundane",
 			weaponType: type,
 			weaponHand: e.hands === "one" ? "hMain" : e.hands ? "hTwo" : "hMain",
 			weaponBaseType: baseKey(type, e.name),
@@ -120,7 +124,7 @@ function implementSystem(e) {
 		system: {
 			description: { value: paragraphs(e.description) + propertyText(e.properties) },
 			source: source(e),
-			weight: e.weight ?? 0, price: e.price ?? 0, rarity: "Mundane",
+			weight: e.weight ?? 0, price: e.price ?? 0, rarity: e.rarity ?? "Mundane",
 			weaponType: "implement",
 			weaponHand: "hMain",
 			weaponBaseType: key,
@@ -138,9 +142,9 @@ const ARMOUR_BASE = { cloth: ["light", "cloth"], leather: ["light", "leather"], 
 
 function armorSystem(e) {
 	const common = {
-		description: { value: paragraphs(e.description) + (e.special ? `<p><strong>Special.</strong> ${esc(e.special)}</p>` : "") },
+		description: { value: paragraphs(e.description) + (e.special ? `<p><strong>Special.</strong> ${esc(e.special)}</p>` : "") + (e.minEnhancement ? `<p><strong>Minimum enhancement:</strong> +${e.minEnhancement}</p>` : "") },
 		source: source(e),
-		weight: e.weight ?? 0, price: e.price ?? 0, rarity: "Mundane",
+		weight: e.weight ?? 0, price: e.price ?? 0, rarity: e.rarity ?? "Mundane",
 	};
 	const penalties = {
 		movePen: e.speed !== null, movePenValue: e.speed ?? 0,
@@ -159,9 +163,20 @@ function ammoSystem(e) {
 	return {
 		description: { value: paragraphs(e.description) },
 		source: source(e),
-		weight: e.weight ?? 0, price: e.price ?? 0, rarity: "Mundane", quantity: e.quantity ?? 1,
+		weight: e.weight ?? 0, price: e.price ?? 0, rarity: e.rarity ?? "Mundane", quantity: e.quantity ?? 1,
 		consumableType: "ammo",
 		uses: { autoDestroy: false, max: "1", value: 1, per: "" },
+	};
+}
+
+/** The adventuring gear's types -> the importer's categories; anything else (food, services, components...) is plain gear. */
+const ITEM_CATEGORIES = { Mount: "mount", Transportation: "transport", "Musical Instrument": "instrument", Building: "building" };
+
+function lootSystem(e) {
+	return {
+		description: { value: paragraphs(e.description) },
+		source: source(e),
+		weight: e.weight ?? 0, price: e.price ?? 0, rarity: e.rarity ?? "Mundane",
 	};
 }
 
@@ -184,7 +199,8 @@ export function buildGear(parsed) {
 			const w = weaponSystem(e);
 			category = w.type;
 			subtype = Object.keys(w.groups)[0] ?? "";
-			if (!w.system.weaponBaseType) notes.push("base-type-unknown");
+			// Improvised weapons are not a named weapon: they have no base type to miss.
+			if (!w.system.weaponBaseType && e.category !== "improvised") notes.push("base-type-unknown");
 			main = item(e, "main", e.name, "weapon", w.system, "main");
 		} else if (e.kind === "implement") {
 			const w = implementSystem(e);
@@ -194,11 +210,14 @@ export function buildGear(parsed) {
 			main = item(e, "main", e.name, "weapon", w.system, "main");
 		} else if (e.kind === "armor") {
 			const a = armorSystem(e);
-			category = e.form;
+			category = e.rarity === "Masterwork" ? "masterwork" : e.form;
 			subtype = a.base;
 			if (e.form === "armor" && !a.base) notes.push("base-type-unknown");
 			if (e.form === "barding") notes.push("barding");
 			main = item(e, "main", e.name, "equipment", a.system, "main");
+		} else if (e.kind === "item") {
+			category = ITEM_CATEGORIES[e.itemType] ?? "gear";
+			main = item(e, "main", e.name, "loot", lootSystem(e), "main");
 		} else {
 			category = "ammo";
 			main = item(e, "main", e.name, "consumable", ammoSystem(e), "main");
@@ -213,7 +232,7 @@ export function buildGear(parsed) {
 		for (const it of items) it.flags.dnd4e.import.bundle = main._id;
 		entries.push({
 			id: e.id, _id: main._id, name: e.name, kind: e.kind, category, subtype,
-			price: e.price, weight: e.weight ?? null, source: e.sourceCode, sources: e.sources, rarity: "Mundane",
+			price: e.price, weight: e.weight ?? null, source: e.sourceCode, sources: e.sources, rarity: e.rarity ?? "Mundane",
 			notes, items,
 		});
 	}
@@ -234,7 +253,8 @@ export function summaryOf(main) {
 		const a = s.armour;
 		return { bonus: a.ac, check: a.skillCheck ? a.skillCheckValue : null, speed: a.movePen ? a.movePenValue : null };
 	}
-	return { quantity: s.quantity };
+	if (main.type === "consumable") return { quantity: s.quantity };
+	return {};
 }
 
 /** A light row for the importer's list. */
