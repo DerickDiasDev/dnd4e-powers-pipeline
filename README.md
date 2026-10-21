@@ -19,7 +19,7 @@ Typical run: `node collect.mjs` (once), then `node parse-powers.mjs && node buil
 ## DB layout
 ```
 out/db/manifest.json         counts and quality totals
-out/db/power/_index.json     one light row per power: id, _id, name, class, powerType, level, usage, action, source, file, quality, review, children
+out/db/power/_index.json     one light row per power (with its keywords, review notes and ability versions): id, _id, name, class, powerType, level, usage, action, source, file, quality, review, children
 out/db/power/<SOURCE>.json   Item data arrays per source book (PHB, Dra385, ...)
 ```
 Each item is `{ _id, name, type: "power", system, flags }`. `_id` is deterministic, so rebuilding keeps ids stable.

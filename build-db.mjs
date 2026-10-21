@@ -499,6 +499,8 @@ async function main() {
 			review: notes.length,
 			reviewLevel: reviewLevel(notes),
 			reviewNotes: notes,
+			// The keywords printed on the power (and on its parts), each once, for the importer's keyword filter.
+			keywords: [...new Set([...p.keywords, ...p.children.flatMap(c => c.keywords)])],
 			// Importing a power imports every item in `items` (main + its other versions + children), in this order.
 			items: items.map(i => i._id),
 			// The melee/ranged versions, and the abilities the player can choose between (one version each), each listed once.

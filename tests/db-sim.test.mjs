@@ -184,3 +184,21 @@ test("a list of abilities before 'modifier' is read whole, never as just its las
 	assert.ok(seen >= 40, `only ${seen} such lists found`);
 	assert.deepEqual(wrong.slice(0, 5), [], `${wrong.length} lists read as fewer abilities`);
 });
+
+test("each index row lists the keywords printed on its power and its parts, once each, none of them empty or joined", { skip }, async () => {
+	const { parsed } = await loadAll();
+	const index = JSON.parse(await readFile(indexFile, "utf8"));
+	const problems = [];
+	let withKeywords = 0;
+	const distinct = new Set();
+	for (const row of index) {
+		const power = parsed.get(row.id);
+		const want = [...new Set([...power.keywords, ...power.children.flatMap(c => c.keywords)])];
+		if (JSON.stringify(row.keywords) !== JSON.stringify(want)) problems.push(`${row.name}: [${row.keywords}] != [${want}]`);
+		for (const k of row.keywords) { distinct.add(k); if (!k || /[,;]/.test(k) || k !== k.trim()) problems.push(`${row.name}: odd keyword "${k}"`); }
+		if (row.keywords.length) withKeywords++;
+	}
+	assert.ok(withKeywords > 8000, `only ${withKeywords} rows have keywords`);
+	assert.ok(distinct.size > 40 && distinct.size < 80, `${distinct.size} distinct keywords`);
+	assert.equal(problems.length, 0, problems.slice(0, 5).join("\n"));
+});

@@ -535,3 +535,20 @@ describe("a transformation whose attack chooses the ability, and a list of abili
 		]);
 	});
 });
+
+describe("keywords", () => {
+	test("keywords bolded together are split into separate keywords", () => {
+		const p = parse("keywordsBoldedTogether");
+		assert.deepEqual(p.keywords, ["Arcane", "Weapon"]);
+		const s = main("keywordsBoldedTogether").system;
+		assert.deepEqual([s.powersource, s.keywordsCustom, s.weaponType], ["arcane", "", "melee"], "the power source and the weapon come from the two keywords");
+	});
+
+	test("a range in the keyword slot is the range, not a keyword", () => {
+		const p = parse("rangeInKeywordSlot");
+		assert.deepEqual(p.keywords, []);
+		assert.equal(p.range.type, "personal");
+		assert.equal(main("rangeInKeywordSlot").system.rangeType, "personal");
+		assert.equal(main("rangeInKeywordSlot").flags.dnd4e.import.review.includes("range-missing"), false);
+	});
+});

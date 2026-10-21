@@ -232,6 +232,16 @@ export const FIXTURES = {
 		}],
 	}),
 
+	// Source quirks: several keywords bolded together, and the range ("Personal") placed where the keywords go
+	keywordsBoldedTogether: entry("t-kw-together", {
+		name: "Test Together", cls: "Wizard", keywords: ["Arcane, Weapon"],
+		blocks: [["Target", "One creature"], ["Attack", "Intelligence vs. AC"], ["Hit", "1[W] + Intelligence modifier damage."]],
+	}),
+	rangeInKeywordSlot: entry("t-personal-kw", {
+		name: "Test Stand", kind: "Utility", keywords: ["Personal"], action: "Minor Action", range: "",
+		blocks: [["Effect", "You stand up."]],
+	}),
+
 	bareAbility: entry("t-bare", {
 		name: "Test Bare", keywords: ["Martial", "Weapon"],
 		blocks: [["Target", "One creature"], ["Attack", "Strength vs. AC"], ["Hit", "2[W] + Strength damage."]],

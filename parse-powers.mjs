@@ -168,7 +168,8 @@ function parseHeader(html) {
 		header.usageRaw = bolds[0] ?? null;
 		header.usage = header.usageRaw ? parseUsage(header.usageRaw) : null;
 		header.special = /\(special\)/i.test(header.usageRaw ?? "");
-		header.keywords = bolds.slice(1).filter(Boolean);
+		// Some entries bold several keywords together ("Arcane, Weapon"): split them.
+		header.keywords = bolds.slice(1).flatMap(k => k.split(",")).map(k => k.trim()).filter(Boolean);
 		if (!header.usage) problems.push(`usage:${header.usageRaw}`);
 	} else problems.push("usage:missing");
 	if (actionLine) {
@@ -181,6 +182,11 @@ function parseHeader(html) {
 			if (header.range?.unrecognised) problems.push(`range:${rangeText}`);
 		}
 	} else problems.push("action:missing");
+	// An entry can put the range ("Personal") where the keywords go and leave the range line out.
+	if (!header.range && header.keywords.some(k => /^personal$/i.test(k))) {
+		header.range = parseRange("Personal");
+		header.keywords = header.keywords.filter(k => !/^personal$/i.test(k));
+	}
 	return { header, problems };
 }
 
