@@ -65,6 +65,14 @@ export const ENUMS = {
 	powerEffectTypes: keysOf("powerEffectTypes"),
 	statusEffects: keysOf("statusEffect"),
 	weaponProf: keysOf("weaponProficiencies"),
+	weaponTypes: keysOf("weaponTypes"),
+	weaponHands: keysOf("weaponHands"),
+	weaponProperties: keysOf("weaponProperties"),
+	weaponGroups: keysOf("weaponGroup"),
+	implements: keysOf("implement"),
+	equipmentTypes: keysOf("equipmentTypes"),
+	equipmentTypesArmour: keysOf("equipmentTypesArmour"),
+	consumableTypes: keysOf("consumableTypes"),
 	// rangeType's nested objects make a one-tab scan useless; these are the keys rangeData() in item.mjs handles.
 	rangeType: ["weapon", "melee", "touch", "reach", "range", "closeBurst", "closeBlast", "rangeBurst", "rangeBlast", "wall", "personal", "special"],
 };
@@ -89,3 +97,6 @@ export const STATUS_IMG = (() => {
 	}
 	return out;
 })();
+
+/** lowercase label -> key of a `DND4E.<name>` table whose values are lang keys ("Longsword" -> "longsword" for militaryM). */
+export const labelMap = name => new Map(entriesOf(name).map(([k, raw]) => [(labelOf(raw) ?? k).toLowerCase(), k]));
