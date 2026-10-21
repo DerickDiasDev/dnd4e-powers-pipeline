@@ -211,10 +211,28 @@ export function buildGear(parsed) {
 	return entries;
 }
 
+/** The numbers the importer's list shows next to a name, read from the main item (damage, bonus, penalties). */
+export function summaryOf(main) {
+	const s = main.system;
+	if (main.type === "weapon") {
+		const part = s.damageDice?.parts?.[0];
+		return {
+			damage: part ? `${part.numDice}d${part.numFaces}` : null, proficiency: s.profBonus || null,
+			range: s.range ? [s.range.value, s.range.long] : null, hand: s.weaponHand, group: Object.keys(s.weaponGroup ?? {})[0] ?? null,
+		};
+	}
+	if (main.type === "equipment") {
+		const a = s.armour;
+		return { bonus: a.ac, check: a.skillCheck ? a.skillCheckValue : null, speed: a.movePen ? a.movePenValue : null };
+	}
+	return { quantity: s.quantity };
+}
+
 /** A light row for the importer's list. */
 export const indexRow = entry => ({
 	id: entry.id, _id: entry._id, name: entry.name, kind: entry.kind, category: entry.category, subtype: entry.subtype,
 	price: entry.price, weight: entry.weight, source: entry.source, sources: entry.sources, rarity: entry.rarity, notes: entry.notes,
+	summary: summaryOf(entry.items[0]),
 	items: entry.items.map(i => i._id),
 });
 

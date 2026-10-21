@@ -134,6 +134,13 @@ describe("building", () => {
 		assert.deepEqual([s.armour.type, s.armour.subtype, s.shieldBaseType, s.armour.ac, s.armour.ref], ["arms", "heavy", "heavy", 2, 2]);
 	});
 
+	test("the index row carries the numbers the list shows, so the list needs no data file", () => {
+		const [e] = build(w("Longsword"));
+		assert.deepEqual(indexRow(e).summary, { damage: "1d8", proficiency: 3, range: null, hand: "hMain", group: "bladeH" });
+		const mail = parseArmor(entry("Zorb mail", `<h1 class=player>Zorb mail</h1><br><b>AC Bonus</b>: +6<br><b>Check</b>: -1<br><b>Weight</b>: 40 lb.<br><b>Cost</b>: 40 gp.<br><b>Type</b>: Chainmail<br>${published}`, { Type: "Chainmail" }));
+		assert.deepEqual(indexRow(build(mail)[0]).summary, { bonus: 6, check: -1, speed: null });
+	});
+
 	test("ammunition is a consumable of type ammo with the pack's quantity", () => {
 		const a = parseWeapon(entry("Zorb arrows", `<h1 class=player>Zorb arrows (30)</h1><br><b>Category</b>: Ammunition<br><b>Price</b>: 1 gp <br><b>Weight</b>: 3 lb<br><b>Description</b>: A quiver.${published}`));
 		const item = build(a)[0].items[0];
