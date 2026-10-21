@@ -364,7 +364,7 @@ export function convertSection(p, base, ctx) {
 				role: ctx.role,
 				bundle: ctx.bundle,
 				// Which parsed section this item came from: null = the power itself, n = parsed.children[n].
-				section: ctx.role === "child" ? ctx.index - 1 : null,
+				section: ctx.role === "child" ? ctx.section : null,
 				...(variant ? { variant } : {}),
 				...(chosen !== null ? { ability: chosen } : {}),
 				...(alternatives.length ? { alternatives } : {}),
@@ -445,8 +445,15 @@ export function convertPower(parsed, ctx) {
 		const index = [version.variant, version.ability].filter(Boolean).join("-");
 		items.push(convertSection(parsed, parsed, { ...ctx, role: "variant", variant: version.variant, ability: version.ability, abilities: version.abilities, bundle: main._id, index }));
 	}
+	// A child is an extra part of the power (the attack you can use while in a form, a second technique, ...). When the player
+	// chooses the ability there, only the child is split: the main power (the form with its several benefits) stays one item.
 	(parsed.children ?? []).forEach((child, i) => {
-		items.push(convertSection(child, parsed, { ...ctx, role: "child", variant: null, bundle: main._id, index: i + 1 }));
+		const abilities = choiceSetFor(child, null);
+		(abilities ?? [null]).forEach((ability, n) => {
+			// The first version keeps the id of a plain child, so earlier builds' ids are unchanged; the others extend it.
+			const index = n === 0 ? i + 1 : `${i + 1}-${ability}`;
+			items.push(convertSection(child, parsed, { ...ctx, role: "child", variant: null, ability, abilities, bundle: main._id, index, section: i }));
+		});
 	});
 	return items;
 }

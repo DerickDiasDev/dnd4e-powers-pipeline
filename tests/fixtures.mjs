@@ -217,6 +217,21 @@ export const FIXTURES = {
 		],
 	}),
 
+	// A fixed attack, and a damage modifier given as a list: "Strength, Wisdom, or Charisma modifier" (read whole, not as just "Charisma")
+	damageCommaList: entry("t-comma", {
+		name: "Test List", cls: "Wizard", keywords: ["Arcane", "Implement"], range: "<b>Ranged</b> 10",
+		blocks: [["Target", "One creature"], ["Attack", "Strength vs. Reflex"], ["Hit", "2d6 + Strength, Wisdom, or Charisma modifier damage."]],
+	}),
+	// A transformation: the form (several benefits) stays one item, only the attack you can use in it chooses the ability
+	formWithChoice: entry("t-form", {
+		name: "Test Form", kind: "Attack", usage: "Daily", keywords: ["Fire", "Polymorph"], action: "Minor Action", range: "<b>Personal</b>",
+		blocks: [["Effect", "You assume the form of the test spirit until the end of the encounter. You gain a +2 power bonus to AC and your melee attacks deal 5 extra fire damage."]],
+		children: [{
+			name: "Test Form Attack", usage: "Encounter", action: "Standard Action", range: "<b>Close</b> burst 1", keywords: ["Fire", "Polymorph"],
+			blocks: [["Target", "Each enemy in the burst"], ["Attack", "Strength, Constitution, or Wisdom vs. Reflex"], ["Hit", "3d10 + Strength, Constitution, or Wisdom modifier fire damage."]],
+		}],
+	}),
+
 	bareAbility: entry("t-bare", {
 		name: "Test Bare", keywords: ["Martial", "Weapon"],
 		blocks: [["Target", "One creature"], ["Attack", "Strength vs. AC"], ["Hit", "2[W] + Strength damage."]],

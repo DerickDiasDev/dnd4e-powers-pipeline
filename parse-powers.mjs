@@ -269,7 +269,7 @@ function parseAttack(text) {
 	};
 }
 
-const TERM = `(?:\\d+d\\d+|\\d+\\[W\\]|\\d+|(?:your\\s+)?(?:(?:${ABIL_RE})(?:\\s+or\\s+(?:${ABIL_RE}))?|(?:(?:highest|chosen|primary)\\s+(?:(?:mental|physical)\\s+)?)?ability(?:\\s+score)?)\\s+modi\\w+)`;
+const TERM = `(?:\\d+d\\d+|\\d+\\[W\\]|\\d+|(?:your\\s+)?(?:(?:${ABIL_RE})(?:(?:\\s*,\\s*(?:or\\s+)?|\\s+or\\s+)(?:${ABIL_RE}))*|(?:(?:highest|chosen|primary)\\s+(?:(?:mental|physical)\\s+)?)?ability(?:\\s+score)?)\\s+modi\\w+)`;
 const TYPES_PART = `(?:(?:${TYPE_RE})(?:\\s*,\\s*(?:and\\s+|or\\s+)?|\\s+(?:and|or)\\s+|\\s+))*`;
 // After a "+", a bare ability name counts as a modifier too ("5[W] + Strength damage", "+ Strength, Dexterity, or Constitution damage").
 const BARE_ABILITY = `(?:${ABIL_RE})(?:\\s*,\\s*(?:or\\s+)?(?:${ABIL_RE})|\\s+or\\s+(?:${ABIL_RE}))*`;

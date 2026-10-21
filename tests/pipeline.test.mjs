@@ -486,3 +486,52 @@ describe("a power that lets the player choose the ability: one version per abili
 		assert.equal(ranged.flags.dnd4e.import.ability, undefined);
 	});
 });
+
+describe("a transformation whose attack chooses the ability, and a list of abilities in the damage", () => {
+	const [novice] = CHARACTERS; // Str +5, Con +3, Wis +4, level 1
+
+	test("the form is one item; only its attack part has a version per ability", () => {
+		const items = convert("formWithChoice");
+		assert.deepEqual(items.map(i => i.name), ["Test Form", "Test Form Attack (Strength)", "Test Form Attack (Constitution)", "Test Form Attack (Wisdom)"]);
+		assert.deepEqual(items.map(i => i.flags.dnd4e.import.role), ["main", "child", "child", "child"]);
+		assert.deepEqual(items.map(i => i.flags.dnd4e.import.ability), [undefined, "str", "con", "wis"], "the form has no ability");
+		assert.deepEqual(items.map(i => i.flags.dnd4e.import.section), [null, 0, 0, 0], "all three versions come from the same part");
+		assert.equal(new Set(items.map(i => i._id)).size, 4);
+		assert.equal(items.every(i => i.flags.dnd4e.import.bundle === items[0]._id), true);
+	});
+
+	test("the form keeps its benefits text and has no attack of its own", () => {
+		const [form] = convert("formWithChoice");
+		assert.equal(form.system.attack.isAttack, false);
+		assert.match(form.system.effect.detail, /\+2 power bonus to AC/);
+		assert.equal(form.flags.dnd4e.import.review.some(r => r.startsWith("ability-versions")), false, "the note belongs to the versions");
+	});
+
+	test("each attack version uses its own ability for the attack and for the damage", () => {
+		const attacks = convert("formWithChoice").slice(1);
+		assert.deepEqual(attacks.map(i => i.system.attack.ability), ["str", "con", "wis"]);
+		for (const i of attacks) assert.equal(i.system.hit.formula, "@powBase + @powerMod", "no weapon or implement: no enhancement term");
+		const power = (i, key) => [simulate(i, novice)[key].min, simulate(i, novice)[key].max];
+		assert.equal(simulate(attacks[0], novice).attack.max, 5); // half level 0 + Str 5
+		assert.equal(simulate(attacks[1], novice).attack.max, 3); // Con 3
+		assert.equal(simulate(attacks[2], novice).attack.max, 4); // Wis 4
+		assert.deepEqual(power(attacks[0], "damage"), [8, 35]); // 3d10 + 5
+		assert.deepEqual(power(attacks[1], "damage"), [6, 33]); // 3d10 + 3
+		assert.deepEqual(power(attacks[2], "damage"), [7, 34]); // 3d10 + 4
+	});
+
+	test("a list of abilities before 'modifier' is read whole", () => {
+		const parsed = parse("damageCommaList");
+		assert.deepEqual(parsed.hit.damage[0].mods, ["str|wis|cha"]);
+		assert.equal(parsed.quality, "full");
+	});
+
+	test("a fixed attack with that damage list gets one version per ability, each with its own damage modifier", () => {
+		const items = convert("damageCommaList");
+		assert.deepEqual(items.map(i => i.name), ["Test List (Strength)", "Test List (Wisdom)", "Test List (Charisma)"]);
+		assert.deepEqual(items.map(i => i.system.attack.ability), ["str", "str", "str"], "the attack ability does not change");
+		assert.deepEqual(items.map(i => i.system.hit.formula), [
+			"@powBase + @powerMod + @wepDamage", "@powBase + @abilities.wis.mod + @wepDamage", "@powBase + @abilities.cha.mod + @wepDamage",
+		]);
+	});
+});
