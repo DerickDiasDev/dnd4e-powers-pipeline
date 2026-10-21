@@ -7,6 +7,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ENUMS } from "./system-enums.mjs";
+import { effectProblems } from "./validate-effects.mjs";
 import { KINDS } from "./parse-options.mjs";
 
 const TIERS = ["Heroic", "Paragon", "Epic"];
@@ -21,6 +22,7 @@ export function validateOptions(kind, entries, index, powerIds) {
 		errors.set(msg, e);
 	};
 	const seen = new Set();
+	const effectIds = new Set();
 	const rowById = new Map(index.map(r => [r.id, r]));
 	for (const e of entries) {
 		const n = e.name;
@@ -33,6 +35,7 @@ export function validateOptions(kind, entries, index, powerIds) {
 		if (e.level !== null && !(Number.isInteger(e.level) && e.level >= 1 && e.level <= 30)) fail(n, `level ${e.level}`);
 		if (!e.items.length || e.items[0]._id !== e._id) fail(n, "the first item must be the option itself");
 		for (const item of e.items) {
+			for (const p of effectProblems(item, effectIds)) fail(n, `effect: ${p}`);
 			if (item.type !== "feature") fail(n, `item "${item.name}" is not a feature`);
 			if (item.system.featureType !== kind || !ENUMS.featureTypes.includes(item.system.featureType)) fail(n, `item "${item.name}" has featureType "${item.system.featureType}"`);
 			if (!/^[A-Za-z0-9]{16}$/.test(item._id)) fail(n, "item _id is not a 16-char id");

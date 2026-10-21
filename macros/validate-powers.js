@@ -57,6 +57,10 @@ for (const data of items) {
 			if (JSON.stringify([...(kept.statuses ?? [])].sort()) !== JSON.stringify([...(fx.statuses ?? [])].sort())) dropped.push(`effects.${fx.name}.statuses`);
 			for (const key of ["durationType", "powerEffectType"]) if (kept.system?.[key] !== fx.system[key]) dropped.push(`effects.${fx.name}.system.${key}`);
 			if ((kept.system?.dots?.length ?? 0) !== fx.system.dots.length) dropped.push(`effects.${fx.name}.system.dots`);
+			// The changes (bonuses, penalties, resistances): same keys, types and values, in order.
+			const sig = list => JSON.stringify((list ?? []).map(c => [c.key, c.type, String(c.value)]));
+			if (sig(kept.system?.changes) !== sig(fx.system.changes)) dropped.push(`effects.${fx.name}.system.changes`);
+			if (Boolean(kept.transfer) !== Boolean(fx.transfer)) dropped.push(`effects.${fx.name}.transfer`);
 		}
 		if (dropped.length) dropped.forEach(path => add(`dropped: ${path}`, data.name));
 		else ok++;

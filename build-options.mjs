@@ -19,6 +19,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { KINDS } from "./parse-options.mjs";
+import { attachFeatureEffects } from "./build-effects.mjs";
+import { ENUMS } from "./system-enums.mjs";
 
 export const OPTION_SCHEMA_VERSION = 1;
 
@@ -86,6 +88,9 @@ export function buildOption(kind, option, powerRows = []) {
 	const items = [main];
 	(option.features ?? []).forEach((f, i) => items.push(featureItem(option, { key: `feature:${i}`, name: f.name, role: "feature", level: f.level, section: i, html: paragraphs(f.text) || "<p></p>" })));
 	for (const item of items) item.flags.dnd4e.import.bundle = main._id;
+	// Standing bonuses written in the text (a feat's benefit, a path's features) become effects that transfer to the owner.
+	const texts = [kind === "feat" ? (option.sections ?? []).map(s => s.text).join("\n") : "", ...(option.features ?? []).map(f => f.text)];
+	items.forEach((item, i) => attachFeatureEffects(item, texts[i], ENUMS.damageTypes));
 
 	const found = powersOf(kind, option, powerRows);
 	// Several powers on the same level are a choice; a lone power is given. A theme gives only its "feature" power.

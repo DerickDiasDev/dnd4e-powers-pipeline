@@ -16,6 +16,8 @@
  * Usage: node build-classes.mjs [--in out/parsed/class.json] [--db out/db]
  */
 import { createHash } from "node:crypto";
+import { attachFeatureEffects } from "./build-effects.mjs";
+import { ENUMS } from "./system-enums.mjs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -110,6 +112,8 @@ export function buildClass(cls, powerRows = []) {
 		html: paragraphs(feature.text) || "<p></p>",
 	})));
 	for (const item of items) item.flags.dnd4e.import.bundle = main._id;
+	// Standing bonuses written in a class feature ("+2 bonus to initiative") become effects that transfer to the owner.
+	items.forEach((item, i) => attachFeatureEffects(item, i === 0 ? "" : cls.features[i - 1].text, ENUMS.damageTypes));
 
 	// Powers named by the features, once each (the same stance list is repeated at several levels)
 	const powers = [];

@@ -355,7 +355,7 @@ export function convertSection(p, base, ctx) {
 	const itemId = stableId(ctx.role === "main" ? base.id : `${base.id}:${ctx.index}`);
 	// The conditions and ongoing damage the text applies become the item's own effects. Mentions of a condition ("your attacks
 	// against prone targets") are not effects and are not counted; the real gaps (no known subject, an aftereffect, a formula) are.
-	const { effects, unresolved: effectGaps } = buildEffects(p, { itemId, img: id => STATUS_IMG[id] });
+	const { effects, unresolved: effectGaps } = buildEffects(p, { itemId, img: id => STATUS_IMG[id], damageTypes: ENUMS.damageTypes });
 	const effectsUnresolved = effectGaps.filter(g => g.why !== "not-applied");
 	if (effectsUnresolved.length) review.push(`effect-unresolved:${effectsUnresolved.length}`);
 

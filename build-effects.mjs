@@ -10,8 +10,9 @@
  * Pure functions: the item builder (build-db.mjs) calls `buildEffects` per converted section.
  */
 import { createHash } from "node:crypto";
+import { parseBonuses, parseResistances } from "./parse-bonuses.mjs";
 
-export const EFFECT_SCHEMA = 1;
+export const EFFECT_SCHEMA = 2;
 
 /** The parser's condition names -> the system's status ids (CONFIG.DND4E.statusEffect). */
 export const STATUS_OF = Object.freeze({ marked: "mark", combatAdvantage: "grantingCA" });
@@ -36,7 +37,29 @@ export function durationTypeOf(duration) {
 const WHEN = Object.freeze({
 	target: { hit: "hit", miss: "miss", effect: "all" },
 	self: { hit: "selfHit", miss: "selfMiss", effect: "self" },
+	allies: { hit: "allies", miss: "allies", effect: "allies" },
 });
+
+/** "+2 power bonus to all defenses", "-2 penalty to attack rolls", "Resist 5 to all damage". */
+export function bonusName(b) {
+	if (b.resist) return b.phrase[0].toUpperCase() + b.phrase.slice(1);
+	const signed = `${b.amount > 0 ? "+" : "-"}${Math.abs(b.amount)}`;
+	return `${signed} ${b.type === "untyped" ? "" : `${b.type} `}${b.amount > 0 ? "bonus" : "penalty"} to ${b.phrase}`;
+}
+
+/**
+ * The bonuses, penalties and resistances written in a text, as effects. Sentences that are conditional or whose amount depends
+ * on something else are not built (parse-bonuses.mjs); a subject the text does not name is reported.
+ * @returns {{effects: object[], unresolved: {what: string, why: string}[]}} effects without ids yet: { subject, durationType, changes, name }
+ */
+export function bonusEffects(text, { damageTypes } = {}) {
+	const effects = [], unresolved = [];
+	for (const b of [...parseBonuses(text).bonuses, ...parseResistances(text, damageTypes).bonuses]) {
+		if (!["self", "target", "allies"].includes(b.subject)) { unresolved.push({ what: b.resist ? "resist" : "bonus", why: "subject" }); continue; }
+		effects.push({ subject: b.subject, durationType: durationTypeOf(b.duration), changes: b.changes, name: bonusName(b) });
+	}
+	return { effects, unresolved };
+}
 
 const stableId = seed => createHash("sha1").update(`dnd4e:effect:${seed}`).digest("base64").replace(/[^A-Za-z0-9]/g, "").slice(0, 16);
 
@@ -45,7 +68,7 @@ const stableId = seed => createHash("sha1").update(`dnd4e:effect:${seed}`).diges
  * @param {{itemId: string, img?: (status: string) => string|undefined}} ctx
  * @returns {{effects: object[], unresolved: {what: string, why: string}[]}}
  */
-export function buildEffects(section, { itemId, img = () => undefined }) {
+export function buildEffects(section, { itemId, img = () => undefined, damageTypes }) {
 	const effects = [];
 	const unresolved = [];
 	const groups = new Map(); // "section|subject|durationType" -> { names, ... }
@@ -69,6 +92,12 @@ export function buildEffects(section, { itemId, img = () => undefined }) {
 				name: `Ongoing ${o.amount}${o.types.length ? ` ${o.types.join(", ")}` : ""}`,
 			});
 		}
+		const bonus = bonusEffects(section[part]?.text, { damageTypes });
+		unresolved.push(...bonus.unresolved);
+		// "Level 11: +3 power bonus" lines change the number as the character levels: a fixed value would be wrong later, so not built.
+		const scales = (section.scaling ?? []).some(s => s.field === part);
+		if (scales && bonus.effects.length) { unresolved.push(...bonus.effects.map(() => ({ what: "bonus", why: "scales" }))); continue; }
+		for (const b of bonus.effects) effects.push({ part, subject: b.subject, durationType: b.durationType, statuses: [], dots: [], changes: b.changes, name: b.name });
 	}
 	for (const g of groups.values()) {
 		effects.push({ part: g.part, subject: g.subject, durationType: g.durationType, statuses: g.names.map(statusId), dots: [], name: g.names.map(label).join(" and ") });
@@ -82,7 +111,7 @@ export function buildEffects(section, { itemId, img = () => undefined }) {
 		transfer: false,
 		statuses: e.statuses,
 		system: {
-			changes: [],
+			changes: e.changes ?? [],
 			durationType: e.durationType,
 			powerEffectType: WHEN[e.subject][e.part],
 			dots: e.dots,
@@ -91,4 +120,34 @@ export function buildEffects(section, { itemId, img = () => undefined }) {
 		flags: { dnd4e: { import: { generated: EFFECT_SCHEMA } } },
 	}));
 	return { effects: built, unresolved };
+}
+
+const CHOICE_OR_SCALING = /\b(?:choose|one of the following|of your choice|select)\b|\bincreases? (?:to|by)\b|\b\d+(?:st|nd|rd|th) level\b|\blevel \d+\b/i;
+
+/**
+ * The standing bonuses of a feature, feat, trait or class feature: "You gain a +1 feat bonus to Will." becomes an effect that
+ * transfers to the owner while the item is on the actor. Only what holds all the time is built: the subject is the character and
+ * there is no duration (a bonus "until the end of the encounter" is a power's, not a feature's).
+ * @returns {object[]} effects for the item's `effects`
+ */
+export function featureEffects(text, { itemId, damageTypes }) {
+	// A feature that offers a choice, or whose numbers change with the level, cannot be a fixed effect.
+	if (CHOICE_OR_SCALING.test(String(text ?? ""))) return [];
+	return bonusEffects(text, { damageTypes }).effects
+		.filter(e => e.subject === "self" && e.durationType === "")
+		.map((e, i) => ({
+			_id: stableId(`${itemId}:${i}`),
+			name: e.name,
+			transfer: true,
+			statuses: [],
+			system: { changes: e.changes, durationType: "", powerEffectType: "misc", dots: [], keywords: [] },
+			flags: { dnd4e: { import: { generated: EFFECT_SCHEMA } } },
+		}));
+}
+
+/** Sets `effects` on a feature item from its text, and counts them in the import flags. */
+export function attachFeatureEffects(item, text, damageTypes) {
+	item.effects = featureEffects(text, { itemId: item._id, damageTypes });
+	if (item.effects.length) item.flags.dnd4e.import.effects = item.effects.length;
+	return item;
 }

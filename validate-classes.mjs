@@ -8,6 +8,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ENUMS } from "./system-enums.mjs";
+import { effectProblems } from "./validate-effects.mjs";
 
 /** @returns {Map<string, {count: number, examples: string[]}>} problems found, keyed by message */
 export function validateClasses(entries, index, powerIds) {
@@ -25,6 +26,7 @@ export function validateClasses(entries, index, powerIds) {
 	};
 
 	const seen = new Set();
+	const effectIds = new Set();
 	for (const e of entries) {
 		const n = e.name;
 		const a = e.apply;
@@ -45,6 +47,7 @@ export function validateClasses(entries, index, powerIds) {
 		} else if (a.hpStart !== null || a.surges !== null) fail(n, "a hybrid class must not write hit points or surges");
 		if (!e.items.length || e.items[0]._id !== e._id) fail(n, "the first item must be the class itself");
 		for (const item of e.items) {
+			for (const p of effectProblems(item, effectIds)) fail(n, `effect: ${p}`);
 			if (item.type !== "feature") fail(n, `item "${item.name}" is not a feature`);
 			if (item.system.featureType !== "class") fail(n, `item "${item.name}" has featureType "${item.system.featureType}"`);
 			if (!/^[A-Za-z0-9]{16}$/.test(item._id)) fail(n, "item _id is not a 16-char id");

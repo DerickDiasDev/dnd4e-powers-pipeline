@@ -15,6 +15,8 @@
  * Usage: node build-races.mjs [--in out/parsed/race.json] [--db out/db]
  */
 import { createHash } from "node:crypto";
+import { attachFeatureEffects } from "./build-effects.mjs";
+import { ENUMS } from "./system-enums.mjs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -87,6 +89,8 @@ export function buildRace(race, powerRows = []) {
 	race.traits.forEach((trait, i) => items.push(featureItem(race, { key: `trait:${i}`, name: trait.name, role: "trait", section: i, html: paragraphs(trait.text) })));
 	main.flags.dnd4e.import.bundle = main._id;
 	for (const item of items) item.flags.dnd4e.import.bundle = main._id;
+	// Standing bonuses written in a racial trait become effects that transfer to the owner.
+	items.forEach((item, i) => attachFeatureEffects(item, i === 0 ? "" : race.traits[i - 1].text, ENUMS.damageTypes));
 
 	const apply = {
 		race: race.name,

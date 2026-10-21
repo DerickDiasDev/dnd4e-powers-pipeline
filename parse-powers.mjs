@@ -33,7 +33,7 @@ const BOOK_CONDITIONS = new Set(["blinded", "dazed", "deafened", "dominated", "h
  * until the start/end of someone's next turn, and until the end of the encounter.
  * Whose turn matters, so the owner is kept: the power's user ("source"), the affected creature ("target"), or someone else.
  */
-function parseDuration(sentence) {
+export function parseDuration(sentence) {
 	let m;
 	if ((m = sentence.match(/save ends(?:\s+(both|all))?/i))) return { type: "saveEnds", group: m[1]?.toLowerCase() ?? null };
 	if ((m = sentence.match(/until the (start|end) of (.{1,30}?)(?:'s)? next turn/i))) {

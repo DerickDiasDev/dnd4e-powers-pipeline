@@ -8,6 +8,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ENUMS } from "./system-enums.mjs";
+import { effectProblems } from "./validate-effects.mjs";
 
 const VISIONS = ["nv", "lv", "dv"];
 
@@ -26,6 +27,7 @@ export function validateRaces(entries, index, powerIds) {
 	};
 
 	const seen = new Set();
+	const effectIds = new Set();
 	for (const e of entries) {
 		const n = e.name;
 		if (seen.has(e._id)) fail(n, "duplicate race _id");
@@ -40,6 +42,7 @@ export function validateRaces(entries, index, powerIds) {
 		if (e.quality === "complete") for (const f of ["size", "speed", "vision"]) if (e.apply[f] === null) fail(n, `complete race without ${f}`);
 		if (!e.items.length || e.items[0]._id !== e._id) fail(n, "the first item must be the race itself");
 		for (const item of e.items) {
+			for (const p of effectProblems(item, effectIds)) fail(n, `effect: ${p}`);
 			if (item.type !== "feature") fail(n, `item "${item.name}" is not a feature`);
 			if (item.system.featureType !== "race") fail(n, `item "${item.name}" has featureType "${item.system.featureType}"`);
 			if (!/^[A-Za-z0-9]{16}$/.test(item._id)) fail(n, "item _id is not a 16-char id");
