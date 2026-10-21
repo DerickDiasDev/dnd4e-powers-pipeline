@@ -344,7 +344,7 @@ export function appliesCondition(sentence) {
 /** The part of the text before position i that belongs to the same sentence. */
 const sentenceBefore = (text, i) => text.slice(0, i).split(/[.;\n]\s*/).at(-1) ?? "";
 
-function analyze(text) {
+export function analyze(text) {
 	const res = { damage: [], ongoing: [], conditions: [], movement: [], resistances: [] };
 	if (!text) return res;
 	const found = [];

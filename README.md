@@ -53,6 +53,9 @@ Each item carries `effects`, the system's own `ActiveEffect4e` data: `statuses` 
 ## Character options
 `parse-options.mjs` -> `out/parsed/option-<kind>.json`, `build-options.mjs` -> `out/db/option/<kind>/_index.json` + `entries.json` (same index shape for every kind), `validate-options.mjs`. Kinds: `feat` (3,272), `path` (paragon paths), `destiny` (epic destinies), `theme`, `background`. Each is a `feature` item (featureType feat/path/destiny/theme/background) with its prerequisite, tier/level and text; paths and destinies add one item per feature with its level. `apply` carries the path or destiny name for the sheet's own fields. `powers` link to the power DB: a path or destiny gives its powers (a choice where two share a level), a theme gives its feature power, a feat the powers its page prints.
 
+## Monsters
+`parse-monsters.mjs` -> `out/parsed/monster.json`, `build-monsters.mjs` -> `out/db/monster/_index.json` + one file of actors per book, `validate-monsters.mjs`. Two page layouts exist (a table under a heading per kind of action; an older stats paragraph with compact power lines): both give the same data. A monster is an **NPC Actor** with the printed numbers as values (`advancedCals: false`: defences, initiative, skills and speed are the printed numbers, not recomputed), its powers as `power` items (printed attack bonus in `attack.formula`, printed damage in `hit.formula` with the critical at maximum dice, `weaponType: none`) and its traits as `feature` items of type trait (an aura keeps its size). Conditions, ongoing damage and bonuses in a power's text become effects exactly as for the player powers (the monster's own name in the text counts as the user). Skills the block does not list are half the level plus the ability modifier. Notes: `conjured`, `minion`, `hp-special` ("infinite hit points"), `initiative-conjurer`, `missing-*`.
+
 ## Tests (`npm test`, ~2 s, no Foundry needed)
 
 | File | What it checks |

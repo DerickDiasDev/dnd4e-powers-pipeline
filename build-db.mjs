@@ -68,7 +68,7 @@ export async function loadClassCategories(outDir) {
 /*  Keywords                                    */
 /* -------------------------------------------- */
 
-function convertKeywords(keywords) {
+export function convertKeywords(keywords) {
 	const damage = new Set();
 	const effect = new Set();
 	const custom = [];
@@ -92,7 +92,7 @@ function convertKeywords(keywords) {
 /*  Range                                       */
 /* -------------------------------------------- */
 
-function convertRange(range, keywords, { needsWeapon = false } = {}) {
+export function convertRange(range, keywords, { needsWeapon = false } = {}) {
 	const review = [];
 	const out = { rangeType: "special", rangePower: "", area: "0", weaponType: "none", rangeText: "" };
 	if (!range) review.push("range-missing");
