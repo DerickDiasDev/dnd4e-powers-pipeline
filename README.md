@@ -1,71 +1,122 @@
-# dnd4e-collector
+# dnd4e-powers-pipeline
 
-Private pipeline that turns a 4e compendium snapshot into Foundry-ready `power` Items for the `dnd4e` system.
-Nothing here ships book content: `out/` and `rules/` are git-ignored and stay on your machine.
+A private pipeline that turns a snapshot of the D&D 4th Edition compendium into a Foundry-ready database for the [`dnd4e`](https://github.com/EndlesNights/dnd4eBeta) system: powers, races, classes, feats, paragon paths, epic destinies, themes, backgrounds and monsters, with their conditions, bonuses and resistances as ActiveEffects. The [`dnd4e-importer`](https://github.com/DerickDiasDev/foundry-dnd4e-importer) module reads that database and imports it into a world.
+
+> **No book content is in this repository.** The compendium is copyrighted. `out/` (the downloaded and generated data) and `rules/` (reference PDFs) are git-ignored and stay on your machine; the tests run on invented text. Use it for your own games.
+
+## What you get
+
+| | Entries | Foundry documents |
+|---|---|---|
+| Powers | 9,415 | 10,130 `power` items (melee/ranged and per-ability versions, extra parts) |
+| Races | 55 | 181 `feature` items + the sheet fields to fill |
+| Classes | 77 | 704 `feature` items (one per class feature, with its level) + the sheet fields to fill |
+| Feats, paragon paths, epic destinies, themes, backgrounds | 3,272 / 577 / 115 / 116 / 817 | `feature` items (paths and destinies: one per feature) |
+| Monsters | 5,329 | NPC actors with their powers, traits and effects |
+
+## Quick start
+
+Requires Node 18 or newer. No dependencies to install.
+
+```sh
+node collect.mjs          # once: downloads the snapshot into out/<category>.json (raw HTML)
+npm run pipeline          # parse -> build -> validate, for every kind of entry
+npm run publish           # copies out/db to <Foundry data>/dnd4e-db (or: node publish-db.mjs --to <folder>)
+npm test                  # ~300 tests, a few seconds, no Foundry needed
+```
+
+`npm run pipeline` stops at the first validation failure. `system-enums.mjs` reads the allowed values (damage types, statuses, skills, ...) straight from the installed system's `config.mjs` and `lang/en.json`, so the converter follows whatever system version is installed (set `DND4E_SYSTEM` to point at another copy).
+
+## How it works
 
 ```
-collect.mjs        iws.mx viewer data (JSONP)        -> out/<category>.json      (raw HTML per entry)
-parse-powers.mjs   power HTML                        -> out/parsed/power.json    (clean intermediate schema)
-build-db.mjs       intermediate schema + system enums -> out/db/                  (PowerData items, grouped by book)
-validate-db.mjs    out/db vs the installed system's enums (static)
-macros/validate-powers.js   run inside Foundry: validates items against the real PowerData model
-macros/smoke-test.js         run inside Foundry (read-only, creates nothing): monsters, effects, feature bonuses and the race/class patches against the real system
-build-review.mjs   out/parsed                        -> out/review/index.html    (local viewer: original vs parsed)
+collect.mjs          compendium viewer data (JSONP)   ->  out/<category>.json         raw HTML per entry
+parse-<kind>.mjs     raw HTML                         ->  out/parsed/<kind>.json      a clean, Foundry-independent schema
+build-<kind>.mjs     parsed schema + system enums     ->  out/db/<kind>/              Foundry document data, deterministic ids
+validate-<kind>.mjs  out/db vs the installed system   ->  pass/fail, grouped by problem
+publish-db.mjs       out/db                           ->  <Foundry data>/dnd4e-db     what the importer reads
 ```
 
-Typical run: `node collect.mjs` (once), then `node parse-powers.mjs && node build-db.mjs && node validate-db.mjs`.
+Kinds: `powers`, `races`, `classes`, `options` (feats, paths, destinies, themes, backgrounds) and `monsters`. Build order matters in one place: `build-db.mjs` (powers) runs first, because races, classes, options and monsters link to the power index and `manifest.json` is rewritten by it.
 
-`system-enums.mjs` reads the allowed values from the system's `config.mjs` / `lang/en.json` (override the path with `DND4E_SYSTEM`), so the converter follows the installed system.
+Two design rules run through everything:
 
-## DB layout
+- **Nothing is invented and nothing is dropped.** A field is structured when its pattern is recognised, kept as text otherwise. What could not be automated is recorded as a *review note* (`flags.dnd4e.import.review`), which the importer shows next to the entry in the user's language.
+- **Ids are deterministic** (a hash of the source id and the part), so rebuilding never changes an id and an import twice never duplicates.
+
+## Output layout
+
 ```
-out/db/manifest.json         counts and quality totals
-out/db/power/_index.json     one light row per power (with its keywords, review notes and ability versions): id, _id, name, class, powerType, level, usage, action, source, file, quality, review, children
-out/db/power/<SOURCE>.json   Item data arrays per source book (PHB, Dra385, ...)
+out/db/manifest.json                 counts and quality totals
+out/db/power/_index.json             one light row per power; out/db/power/<BOOK>.json holds the items of each book
+out/db/race/      _index.json  races.json
+out/db/class/     _index.json  classes.json
+out/db/option/<feat|path|destiny|theme|background>/   _index.json  entries.json
+out/db/monster/   _index.json  <BOOK>.json            one file of actors per book
 ```
-Each item is `{ _id, name, type: "power", system, flags }`. `_id` is deterministic, so rebuilding keeps ids stable.
 
-### Bundles: one listing, several items
-The index lists **one row per power**. Importing a row imports every item in its `items` array, in order:
+An index row is small and has what the importer lists (name, level, book, quality, notes, the ids of its items); the data files hold the Foundry document data.
 
-| `flags.dnd4e.import.role` | what it is |
+## Powers
+
+Each item is `{ _id, name, type: "power", system, flags, effects }`. One listing can import several items (a **bundle**; all share `flags.dnd4e.import.bundle`):
+
+| `import.role` | What it is |
 |---|---|
 | `main` | the power itself (the *melee* version when the power is split) |
-| `variant` | every other version of the power: the *ranged* version of a melee/ranged power, and one version per ability when the player chooses the ability |
-| `child` | an extra part of the power (secondary attack, second technique, ...) |
+| `variant` | another version: the *ranged* version, or one version per ability when the player chooses the ability |
+| `child` | an extra part (a secondary attack, a second technique, the attack you can use in a form) |
 
-All members share `import.bundle` (the main item's `_id`). A power is split into "Name (Melee)" / "Name (Ranged)" only when the attack or the damage differs between the two
-(47 powers, e.g. `Strength vs. AC (melee) or Dexterity vs. AC (ranged)`); the ~190 powers with the same stats for both use one item with `weaponType: meleeRanged`.
+- **Melee/ranged**: a power is split in two only when the attack or the damage differs between the sides (47 powers); the rest use one item with `weaponType: meleeRanged`.
+- **Choice of ability** ("Strength or Wisdom vs. AC"): one version per ability (215 powers), each with its own attack ability and damage modifier. When the choice is in a child part, only that part is split; a transformation with several benefits stays one item.
+- **Damage and attack** become the system's formulas (`@powBase`, `@powerMod`, `@wepDamage`, `@primaryMod`, ...), checked numerically against the rules (see Tests).
+- `flags.dnd4e.import` also keeps what PowerData cannot express: `review`, `extraDamage`, `ongoing`, `scaling` and `candidates` (everything the text mentions: conditions, resistances, forced movement).
 
-### Choice of ability
-When the text lets the player choose the ability ("Strength or Wisdom vs. AC", or a fixed attack with "+ Strength, Dexterity, or Constitution damage"), the power imports one version per ability: "Name (Strength)", "Name (Wisdom)". Each version has its own attack ability and damage modifier, `flags.dnd4e.import.ability`, and a note `ability-versions`. In the current data this is 215 powers with 2 or 3 options (290 extra items). When the choice is in a child part (typically the attack you can use while in a transformation, such as "Form of the Forge Spirit"), only that part is split: the form, with its several benefits, stays one item and its attack becomes "Forge Spirit Attack (Strength)", "(Constitution)", "(Wisdom)". The index row lists them in `abilities`. A melee/ranged power with a choice on one side gets a version per combination that exists ("Name (Melee, Strength)", "Name (Melee, Dexterity)", "Name (Ranged)").
+## Effects
 
-`flags.dnd4e.import` also holds what PowerData cannot express yet: `review` notes, `extraDamage`, `ongoing`, `scaling`, and `candidates` (everything the text mentions: conditions, resistances, forced movement).
+Each item (power, monster power) carries `effects`, the system's own `ActiveEffect4e` data, so the system applies them when the power is used:
 
-### Effects (ActiveEffects embedded in the items)
-Each item carries `effects`, the system's own `ActiveEffect4e` data: `statuses` (a condition: `dazed`, `mark`, `grantingCA`...), `system.durationType` (`saveEnd`, `endOfUserTurn`, `endOfTargetTurn`, `startOfUserTurn`, `startOfTargetTurn`, `endOfEncounter`, `custom`, or empty), `system.powerEffectType` (when it is applied: `hit`, `miss`, `all`, `self`, `selfHit`, `selfMiss`) and `system.dots` (ongoing damage). The system applies them to the targets when the power is used. Only what the text *applies* is built: a condition on a named subject (the target or the user) with a duration the system has; a mention ("your attacks against prone targets", "the dazed condition ends") is not an effect. What could not be built (an aftereffect, a subject the text does not name, an ongoing damage with a formula) is listed in `flags.dnd4e.import.effectsUnresolved` and gives the info note `effect-unresolved`. Bonuses, penalties and resistances written as a plain number are also effects (`parse-bonuses.mjs`): a defence, speed, save, initiative or skill bonus goes to the sheet slot of its type (`system.defences.ac.power`, `system.skills.prc.feat`, ...), attack and damage rolls to the system's own keyed bonuses (`power.attack.melee.power`), resistance to `system.resistances.<type>.res` (vulnerability `.vuln`). Typed bonuses use `upgrade` (the highest of the type counts) and untyped ones `add`, as the 4e stacking rules say. A bonus is built only when it is certain: not conditional ("against", "while", "your next attack roll"), not narrowed ("checks made to perform the ritual"), not a choice, not scaling with the level ("Level 11: +3"), the subject named. A power's effects are applied to its targets (or its user) when it is used; the standing bonuses of a feat, a racial trait, a class or path feature are effects on the feature item that transfer to the character while it is owned. Forced movement is not automated. `validate-effects.mjs` checks every effect against the installed system's enums; the in-Foundry macro also checks the model keeps them.
+- **Conditions** (`statuses`: `dazed`, `prone`, `mark`, `grantingCA`, ...) with their duration (`system.durationType`: `saveEnd`, `endOfUserTurn`, `endOfTargetTurn`, `startOfUserTurn`, `startOfTargetTurn`, `endOfEncounter`, `custom`) and when they apply (`system.powerEffectType`: `hit`, `miss`, `all`, `self`, `selfHit`, `selfMiss`, `allies`).
+- **Ongoing damage** as `system.dots`.
+- **Bonuses, penalties and resistances written as a plain number** (`parse-bonuses.mjs`): defences, speed, saves, initiative and skills go to the sheet slot of their type (`system.defences.ac.power`, `system.skills.prc.feat`); attack and damage rolls to the system's keyed bonuses (`power.attack.melee.power`); resistances to `system.resistances.<type>.res` (`.vuln` for vulnerability). Typed bonuses use `upgrade` (the highest counts) and untyped ones `add`, as the 4e stacking rules say.
+- **Standing bonuses** of a feat, a racial trait or a class/path feature are effects on that feature item that `transfer` to the character while it is owned.
 
-## Races
-`parse-races.mjs` -> `out/parsed/race.json`, `build-races.mjs` -> `out/db/race/_index.json` + `races.json`, `validate-races.mjs` checks them against the system's enums. A race is a set of `feature` items (the race + one per trait), an `apply` block (what the importer writes into the actor: size, origin, vision, speed, languages, skill and defence bonuses) and the racial powers found in the power DB (`granted` when the traits name them). Ability score bonuses are kept as text only. `npm run pipeline` runs everything.
+Only what is certain is built: a condition the text *applies* (not one it merely mentions), on a subject it names, with a duration the system has; a bonus that is not conditional ("against", "while", "your next attack roll"), not narrowed, not a choice and not scaling with the level. The rest stays in the text and `flags.dnd4e.import.effectsUnresolved`, and gives the info note `effect-unresolved`. **Not automated:** forced movement, aftereffects, bonuses that depend on a modifier or the level, auras and zones.
 
-## Classes
-`parse-classes.mjs` -> `out/parsed/class.json`, `build-classes.mjs` -> `out/db/class/_index.json` + `classes.json`, `validate-classes.mjs`. A class is a set of `feature` items (the class + one per class feature, with its level), an `apply` block (class name, primary ability = first key ability, hit points, surges base, defence bonuses, fixed trained skills, armour and weapon proficiencies; empty for hybrid classes) and the powers its features name, found in the power DB (`granted` for "You gain the X power", `option` when several cards are offered). Features are cut where a power card begins; the cards themselves are not copied.
+## Races, classes and options
 
-## Character options
-`parse-options.mjs` -> `out/parsed/option-<kind>.json`, `build-options.mjs` -> `out/db/option/<kind>/_index.json` + `entries.json` (same index shape for every kind), `validate-options.mjs`. Kinds: `feat` (3,272), `path` (paragon paths), `destiny` (epic destinies), `theme`, `background`. Each is a `feature` item (featureType feat/path/destiny/theme/background) with its prerequisite, tier/level and text; paths and destinies add one item per feature with its level. `apply` carries the path or destiny name for the sheet's own fields. `powers` link to the power DB: a path or destiny gives its powers (a choice where two share a level), a theme gives its feature power, a feat the powers its page prints.
+A race, class, feat, path, destiny or theme is a set of `feature` items (the thing itself, plus one per trait or feature, with its level), an `apply` block and the powers it names, found in the power database:
+
+- `apply` is what the importer writes into the actor, declaratively: for a race the size, origin, vision, speed, languages and the skill and defence bonuses; for a class the primary ability (the first key ability), hit points, healing surges, defence bonuses, fixed trained skills and the armour and weapon proficiencies (hybrid classes only their name); for a path or destiny its name on the sheet. Ability score bonuses stay as text: the choice is the player's.
+- `powers` link to the power index; `kind: granted` when the text says "You gain the X power", `option` when the player picks among several.
 
 ## Monsters
-`parse-monsters.mjs` -> `out/parsed/monster.json`, `build-monsters.mjs` -> `out/db/monster/_index.json` + one file of actors per book, `validate-monsters.mjs`. Two page layouts exist (a table under a heading per kind of action; an older stats paragraph with compact power lines): both give the same data. A monster is an **NPC Actor** with the printed numbers as values (`advancedCals: false`: defences, initiative, skills and speed are the printed numbers, not recomputed), its powers as `power` items (printed attack bonus in `attack.formula`, printed damage in `hit.formula` with the critical at maximum dice, `weaponType: none`) and its traits as `feature` items of type trait (an aura keeps its size). Conditions, ongoing damage and bonuses in a power's text become effects exactly as for the player powers (the monster's own name in the text counts as the user). Skills the block does not list are half the level plus the ability modifier. Notes: `conjured`, `minion`, `hp-special` ("infinite hit points"), `initiative-conjurer`, `missing-*`.
 
-## Tests (`npm test`, ~2 s, no Foundry needed)
+Two page layouts exist (a table under a heading per kind of action; an older stats paragraph with compact power lines); both give the same data. A monster is an **NPC actor** with the printed numbers as values (`advancedCals: false`: defences, initiative, skills and speed are the printed numbers, not recomputed), its powers as `power` items (printed attack bonus in `attack.formula`, printed damage in `hit.formula`, the critical at maximum dice, `weaponType: none`) and its traits as `feature` items of type trait (an aura keeps its size). Conditions, ongoing damage and bonuses in a power's text become effects exactly as for the player powers; the monster's own name in the text counts as the user. Skills the block does not list are half the level plus the ability modifier. Notes: `conjured`, `minion`, `hp-special`, `initiative-conjurer`, `missing-*`.
 
-| File | What it checks |
+## Tests
+
+`npm test` runs without Foundry:
+
+| What | How |
 |---|---|
-| `tests/pipeline.test.mjs` | Parser and converter on **synthetic** fixtures (`tests/fixtures.mjs`, invented text, safe to commit). One behaviour per test, named after the bug it guards (self damage, melee/ranged split, resistances, durations with owner, ...). |
-| `tests/db-sim.test.mjs` | Over the **whole DB**: every item is "rolled" for fictional characters and compared with the number the book rules give. Skipped when `out/` is missing. |
-| `tests/sim/sheet.mjs` | Sheet simulator: evaluates the item's formulas the way the dnd4e system does (`@powBase`, `@powerMod`, `@wepDamage`, ...). |
-| `tests/sim/oracle.mjs` | The expected numbers, from the parsed book text and Rules Compendium p. 80. It never reads the item's formulas. |
-| `tests/sim/characters.mjs` | Two characters (level 1 and 21) whose ability modifiers and weapon numbers are all different, so a wrong ability or weapon changes the total. |
+| Parsers and builders | on **invented** fixtures (`tests/fixtures.mjs` and the fixtures inside each test file; no book text), one behaviour per test, named after the bug it guards |
+| Damage and attack numbers | `tests/db-sim.test.mjs` "rolls" every power for fictional characters with `tests/sim/sheet.mjs` (the system's rules) and compares it with `tests/sim/oracle.mjs` (the number the Rules Compendium gives); it never reads the item's formulas |
+| The whole real database | invariants over `out/db` (static validation against the system's enums, id uniqueness, plausible ranges, known entries); skipped when `out/` is missing |
+| Mutation checks | a deliberate break of a rule must make a test fail (done by hand when a rule is added) |
 
-**Limit:** `sheet.mjs` copies the system's *rules* (item.mjs `getPowBase`/`getPowMax`/`getRollData`, weapon defaults), not its code. If the system changes those, update `sheet.mjs`.
-Anything that depends on the real runtime (which weapon is equipped, actor derived data, chat output) still has to be confirmed inside Foundry (`macros/validate-powers.js`, and the planned in-Foundry harness).
+Inside Foundry (a world on the `dnd4e` system, the importer active, the database published):
+
+- `macros/validate-powers.js` checks that the real data model keeps every field and effect of the chosen files.
+- `macros/smoke-test.js` is read-only (it builds actors in memory) and checks the monsters' printed numbers after the system's own derived data, that effects apply and stack as 4e says, that feature bonuses transfer, and that the race and class sheet fills give the numbers of the book.
+
+`tests/sim/sheet.mjs` copies the system's *rules*, not its code: if the system changes how powers are computed, update it.
+
+## Related repositories
+
+- [`foundry-dnd4e-importer`](https://github.com/DerickDiasDev/foundry-dnd4e-importer): the module that reads this database.
+- [`foundry-dnd4e-system`](https://github.com/DerickDiasDev/foundry-dnd4e-system): a fork of the `dnd4e` system with the changes this work needs (a primary ability field).
+
+## License
+
+Not chosen yet; until one is added, all rights are reserved. The code is for personal use. The data it produces comes from copyrighted books and is not to be redistributed.
