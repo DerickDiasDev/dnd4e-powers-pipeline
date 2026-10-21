@@ -44,6 +44,9 @@ When the text lets the player choose the ability ("Strength or Wisdom vs. AC", o
 ## Races
 `parse-races.mjs` -> `out/parsed/race.json`, `build-races.mjs` -> `out/db/race/_index.json` + `races.json`, `validate-races.mjs` checks them against the system's enums. A race is a set of `feature` items (the race + one per trait), an `apply` block (what the importer writes into the actor: size, origin, vision, speed, languages, skill and defence bonuses) and the racial powers found in the power DB (`granted` when the traits name them). Ability score bonuses are kept as text only. `npm run pipeline` runs everything.
 
+## Classes
+`parse-classes.mjs` -> `out/parsed/class.json`, `build-classes.mjs` -> `out/db/class/_index.json` + `classes.json`, `validate-classes.mjs`. A class is a set of `feature` items (the class + one per class feature, with its level), an `apply` block (class name, primary ability = first key ability, hit points, surges base, defence bonuses, fixed trained skills, armour and weapon proficiencies; empty for hybrid classes) and the powers its features name, found in the power DB (`granted` for "You gain the X power", `option` when several cards are offered). Features are cut where a power card begins; the cards themselves are not copied.
+
 ## Tests (`npm test`, ~2 s, no Foundry needed)
 
 | File | What it checks |
