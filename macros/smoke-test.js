@@ -14,6 +14,9 @@
  *                 the same type do not stack while different types do, a resistance shows in the resistance table
  *   C. features   a feat/feature bonus transfers to its owner (+2 feat bonus to Perception), typed vs untyped stacking
  *   D. patches    the race and class "fill the sheet" updates are accepted by the model and give the numbers the book gives
+ *   E. equipment  armour, shields and weapons change the sheet as the book says (AC, speed, armour check, dice, proficiency); gear is accepted
+ *   F. magic      a level chosen at import gives its enhancement and price; plain bonuses work only while equipped; a magic weapon based on a
+ *                 mundane one rolls its dice; magic armour of one kind is that armour plus the enhancement
  */
 const MODULE_ID = "dnd4e-importer";
 const base = (game.settings.get(MODULE_ID, "dbPath") || "dnd4e-db").replace(/^\/+|\/+$/g, "");
@@ -211,6 +214,132 @@ await run("D patches", "the knight (a fighter build)", async () => {
 	eq("D patches", "knight: +2 Fortitude (class)", actor.system.defences.fort.value - fortBefore, 2);
 	eq("D patches", "knight: proficient with plate and heavy shields", ["plate", "heavy"].map(k => actor.system.details.armourProf.value.has(k)), [true, true]);
 	eq("D patches", "knight: military melee weapons", actor.system.details.weaponProf.value.has("militaryM"), true);
+});
+
+/* ======================================================= E. equipment */
+const gearModule = await import(`/modules/${MODULE_ID}/scripts/gear.mjs`);
+const magicModule = await import(`/modules/${MODULE_ID}/scripts/magic.mjs`);
+const planModule = await import(`/modules/${MODULE_ID}/scripts/plan.mjs`);
+const gearIndex = await get("gear/_index.json");
+const gearEntry = async name => {
+	const row = gearIndex.find(r => r.name === name);
+	if (!row) throw new Error(`gear "${name}" is not in the database`);
+	return (await get("gear/gear.json")).find(e => e._id === row._id);
+};
+/** The item data of an entry as an import would create it, optionally equipped. */
+const gearItems = async (name, equip = false) => {
+	const entry = await gearEntry(name);
+	const { create } = gearModule.planGearImport(entry);
+	return equip ? gearModule.equipItems(create) : create;
+};
+
+await run("E equipment", "armour: heavy armour changes AC, speed and the armour-check skills only while worn", async () => {
+	const plain = make(pc());
+	const worn = make(pc(), { items: await gearItems("Plate Armor", true) });
+	const packed = make(pc(), { items: await gearItems("Plate Armor", false) });
+	eq("E equipment", "plate armour worn: +8 AC", worn.system.defences.ac.value - plain.system.defences.ac.value, 8);
+	eq("E equipment", "plate armour worn: speed -1", worn.system.movement.walk.value - plain.system.movement.walk.value, -1);
+	eq("E equipment", "plate armour worn: Stealth -2 (armour check)", worn.system.skills.stl.total - plain.system.skills.stl.total, -2);
+	eq("E equipment", "plate armour only carried: nothing changes", [packed.system.defences.ac.value - plain.system.defences.ac.value, packed.system.movement.walk.value - plain.system.movement.walk.value], [0, 0]);
+});
+
+await run("E equipment", "armour: a shield gives its bonus to AC and Reflex, and only to who is proficient", async () => {
+	const plain = make(pc());
+	const trained = make(pc({ details: { armourProf: { value: ["heavy"] } } }), { items: await gearItems("Heavy Shield", true) });
+	const untrained = make(pc(), { items: await gearItems("Heavy Shield", true) });
+	const reference = make(pc({ details: { armourProf: { value: ["heavy"] } } }));
+	eq("E equipment", "heavy shield, proficient: +2 AC and +2 Reflex", ["ac", "ref"].map(k => trained.system.defences[k].value - reference.system.defences[k].value), [2, 2]);
+	eq("E equipment", "heavy shield, not proficient: no benefit", ["ac", "ref"].map(k => untrained.system.defences[k].value - plain.system.defences[k].value), [0, 0]);
+});
+
+await run("E equipment", "a weapon rolls the dice of the book and knows what it is proficient with", async () => {
+	const sword = make(pc({ details: { weaponProf: { value: ["militaryM"] } } }), { items: await gearItems("Longsword") }).items.find(i => i.name === "Longsword");
+	eq("E equipment", "longsword: weapon dice 1d8", sword.getWepDice(), "1d8");
+	eq("E equipment", "longsword: proficient for a military melee character", sword.isActorProficient, true);
+	const untrained = make(pc(), { items: await gearItems("Longsword") }).items.find(i => i.name === "Longsword");
+	eq("E equipment", "longsword: not proficient for a character with no weapon training", untrained.isActorProficient, false);
+	const bow = make(pc(), { items: await gearItems("Longbow") }).items.find(i => i.name === "Longbow");
+	eq("E equipment", "longbow: dice 1d10, ranged, range 20/40", [bow.getWepDice(), bow.system.isRanged, bow.system.range.value, bow.system.range.long], ["1d10", true, 20, 40]);
+});
+
+await run("E equipment", "a double weapon is two items, ammunition is a pack, gear is loot", async () => {
+	const axe = await gearItems("Double axe");
+	eq("E equipment", "double axe: both ends", axe.map(i => i.name), ["Double axe", "Double axe - secondary end"]);
+	const a = make(pc(), { items: [...axe, ...(await gearItems("Arrows")), ...(await gearItems("Alchemy Case"))] });
+	eq("E equipment", "arrows: 30 of them, ammunition", [a.items.find(i => i.name === "Arrows").system.quantity, a.items.find(i => i.name === "Arrows").system.consumableType], [30, "ammo"]);
+	eq("E equipment", "alchemy case: loot, 40 gp", [a.items.find(i => i.name === "Alchemy Case").type, a.items.find(i => i.name === "Alchemy Case").system.price], ["loot", 40]);
+});
+
+await run("E equipment", "masterwork armour and a rod implement are accepted by the model", async () => {
+	const a = make(pc(), { items: [...await gearItems("Baazrag Bone Armor", true), ...await gearItems("Rod Implement")] });
+	const armour = a.items.find(i => i.name === "Baazrag Bone Armor");
+	eq("E equipment", "baazrag bone armour: AC bonus 8, and 'Minimum enhancement: +2' in the text", [armour.system.armour.ac, armour.system.description.value.includes("Minimum enhancement:</strong> +2")], [8, true]);
+	eq("E equipment", "rod implement: an implement of group rod", [a.items.find(i => i.name === "Rod Implement").system.weaponType, a.items.find(i => i.name === "Rod Implement").system.weaponBaseType], ["implement", "rod"]);
+});
+
+/* ======================================================= F. magic items */
+const magicIndex = await get("magic/_index.json");
+const magicRow = name => {
+	const row = magicIndex.find(r => r.name === name);
+	if (!row) throw new Error(`magic item "${name}" is not in the database`);
+	return row;
+};
+const magicEntry = async row => (await get(`magic/${row.file}`)).find(e => e._id === row._id);
+/** The item an import would create at `level` (null: the first), optionally based on a weapon and equipped. */
+const magicItem = async (name, { level = null, base = null, equip = false } = {}) => {
+	const row = magicRow(name);
+	const entry = await magicEntry(row);
+	const { create } = magicModule.planMagicImport(entry, row, new Set(), { level, baseWeapon: base });
+	return { row, items: equip ? gearModule.equipItems(create) : create };
+};
+
+await run("F magic", "a magic item's plain bonus works only while it is equipped", async () => {
+	const base0 = make(pc()).system.skills.thi.total;
+	const worn = make(pc(), { items: (await magicItem("Burglar's Gloves", { equip: true })).items });
+	const packed = make(pc(), { items: (await magicItem("Burglar's Gloves")).items });
+	eq("F magic", "burglar's gloves worn: Thievery +1", worn.system.skills.thi.total - base0, 1);
+	eq("F magic", "burglar's gloves only carried: the effect is there but suppressed", [packed.system.skills.thi.total - base0, [...packed.allApplicableEffects()].some(e => e.isSuppressed)], [0, true]);
+});
+
+await run("F magic", "a level is chosen at import: enhancement, price and name follow", async () => {
+	const { items } = await magicItem("Magic Holy Symbol", { level: 11 });
+	eq("F magic", "magic holy symbol at level 11: +3, 9,000 gp, level 11", [items[0].name, items[0].system.enhance, items[0].system.price, items[0].system.level], ["Magic Holy Symbol +3", 3, 9000, 11]);
+	const a = make(pc(), { items });
+	eq("F magic", "the model keeps it: an implement, holy symbol, +3", [a.items.contents[0].system.weaponType, a.items.contents[0].system.weaponBaseType, a.items.contents[0].system.enhance], ["implement", "holyS", 3]);
+	const row = magicRow("Magic Holy Symbol");
+	const first = magicModule.planMagicImport(await magicEntry(row), row, new Set(), { level: 1 });
+	const second = magicModule.planMagicImport(await magicEntry(row), row, planModule.existingKeys(first.create), { level: 11 });
+	eq("F magic", "two levels of the same item can be imported side by side; the same level twice cannot", [second.create.length, magicModule.planMagicImport(await magicEntry(row), row, planModule.existingKeys(first.create), { level: 1 }).create.length], [1, 0]);
+});
+
+await run("F magic", "a magic weapon based on a mundane one rolls that weapon's dice", async () => {
+	const mace = (await gearEntry("Mace")).items[0];
+	const { items } = await magicItem("Weapon of Disruption", { level: 15, base: mace });
+	const a = make(pc(), { items });
+	const weapon = a.items.contents[0];
+	eq("F magic", "weapon of disruption at 15: +3, based on the mace", [weapon.system.enhance, weapon.flags.dnd4e.import.baseWeapon], [3, "Mace"]);
+	eq("F magic", "its weapon dice are the mace's", weapon.getWepDice(), `${mace.system.damageDice.parts[0].numDice}d${mace.system.damageDice.parts[0].numFaces}`);
+	const bow = (await gearEntry("Longbow")).items[0];
+	const unfit = (await magicItem("Weapon of Disruption", { base: bow })).items[0];
+	eq("F magic", "a bow does not fit a mace item: no base applied", [unfit.flags.dnd4e.import.baseWeapon ?? null, unfit.system.damageDice?.parts?.length ?? 0], [null, 0]);
+});
+
+await run("F magic", "magic armour of one kind is that armour plus its enhancement", async () => {
+	const plain = make(pc());
+	const { items } = await magicItem("Quicksilver Armor", { level: 10, equip: true });
+	const worn = make(pc(), { items });
+	eq("F magic", "quicksilver armour (chain) at 10: +6 chain +2 enhancement = +8 AC", worn.system.defences.ac.value - plain.system.defences.ac.value, 8);
+	eq("F magic", "it is chain, heavy armour", [items[0].system.armour.subtype, items[0].system.armourBaseType], ["heavy", "chain"]);
+});
+
+await run("F magic", "every item with effects is accepted by the model and its effects are suppressed when not equipped", async () => {
+	const rows = magicIndex.filter(r => r.effects > 0).filter((_, i) => i % 3 === 0).slice(0, 40);
+	const items = [];
+	for (const row of rows) items.push(...magicModule.planMagicImport(await magicEntry(row), row, new Set(), {}).create);
+	const packed = make(pc(), { items });
+	const expected = items.reduce((n, i) => n + i.effects.length, 0);
+	eq("F magic", `${rows.length} items with effects: all their effects are on the actor`, [...packed.allApplicableEffects()].length, expected);
+	eq("F magic", "carried, none of them is active", [...packed.allApplicableEffects()].filter(e => !e.isSuppressed).length, 0);
 });
 
 /* ======================================================= report */
