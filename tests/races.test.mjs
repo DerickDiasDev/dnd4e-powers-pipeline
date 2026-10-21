@@ -106,12 +106,13 @@ describe("race parser", () => {
 	});
 
 	test("a race page with no headed sections: the description is the closing text, never the traits block again", () => {
-		const p = page({ traits: TRAITS });
+		const power = "<span class=power><h1 class=encounterpower>Zorbling Hop<span class=level>Zorbling Racial Power</span></h1><p class=flavor><i>You hop.</i></p><p class=flavor><b>Effect</b>: You hop three squares.<br></p><br></span>";
+		const p = page({ traits: TRAITS, powers: power });
 		p.html = p.html.replace(/<h3>PHYSICAL[\s\S]*$/, "<b>Zorbling Names</b>: Blub, Glub<br><p class=publishedIn>Published in Test Book, page(s) 1.</p>");
 		const r = parseRace(p);
 		assert.deepEqual(r.description, [{ heading: "", text: "Zorbling Names: Blub, Glub\nPublished in Test Book, page(s) 1." }]);
 		const text = buildRace(r, POWERS).items[0].system.description.value;
-		assert.equal((text.match(/RACIAL TRAITS|Marsh Step|Average Height/g) ?? []).length, 0);
+		assert.equal((text.match(/RACIAL TRAITS|Marsh Step|Average Height|Racial Power|three squares/g) ?? []).length, 0, "neither the traits nor the racial power text again");
 		assert.equal((text.match(/<h3>/g) ?? []).length, 0, "no empty or invented heading");
 	});
 

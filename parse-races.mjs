@@ -150,6 +150,7 @@ function prose(html) {
 	// Without headed sections the text is whatever is left once the title, tagline and traits block (already parsed) are removed.
 	const body = start >= 0 ? html.slice(start) : html
 		.replace(/<blockquote>[\s\S]*?<\/blockquote>/i, "")
+		.replace(/<span class=power>[\s\S]*?<br><\/span>/gi, "") // the racial powers are in the power database
 		.replace(/<p class=flavor><b>RACIAL TRAITS<\/b><\/p>/i, "")
 		.replace(/^[\s\S]*?<\/h1>/i, "")
 		.replace(/^\s*<i>[\s\S]*?<\/i>/i, "");
