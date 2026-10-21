@@ -50,6 +50,14 @@ for (const data of items) {
 		const doc = await Item.implementation.create(foundry.utils.deepClone(data), { temporary: true });
 		const dropped = [];
 		missing(data.system, doc.toObject().system, "system", dropped);
+		// The effects embedded in the item: every one must survive the model with its statuses, timing and dots.
+		for (const fx of data.effects ?? []) {
+			const kept = doc.effects.get(fx._id)?.toObject();
+			if (!kept) { dropped.push(`effects.${fx.name}`); continue; }
+			if (JSON.stringify([...(kept.statuses ?? [])].sort()) !== JSON.stringify([...(fx.statuses ?? [])].sort())) dropped.push(`effects.${fx.name}.statuses`);
+			for (const key of ["durationType", "powerEffectType"]) if (kept.system?.[key] !== fx.system[key]) dropped.push(`effects.${fx.name}.system.${key}`);
+			if ((kept.system?.dots?.length ?? 0) !== fx.system.dots.length) dropped.push(`effects.${fx.name}.system.dots`);
+		}
 		if (dropped.length) dropped.forEach(path => add(`dropped: ${path}`, data.name));
 		else ok++;
 	} catch (err) {

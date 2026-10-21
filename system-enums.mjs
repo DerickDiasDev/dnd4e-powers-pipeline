@@ -61,6 +61,9 @@ export const ENUMS = {
 	spoken: keysOf("spoken"),
 	featureTypes: keysOf("featureTypes"),
 	armourProf: keysOf("profArmor"),
+	durationType: keysOf("durationType"),
+	powerEffectTypes: keysOf("powerEffectTypes"),
+	statusEffects: keysOf("statusEffect"),
 	weaponProf: keysOf("weaponProficiencies"),
 	// rangeType's nested objects make a one-tab scan useless; these are the keys rangeData() in item.mjs handles.
 	rangeType: ["weapon", "melee", "touch", "reach", "range", "closeBurst", "closeBlast", "rangeBurst", "rangeBlast", "wall", "personal", "special"],
@@ -72,3 +75,17 @@ EFFECT_BY_LABEL.set("channel divinity", "channelDiv");
 
 /** lowercase key -> real key, so "Elemental"/"elemental" both resolve for powerSource. */
 export const POWER_SOURCE_BY_LOWER = new Map(ENUMS.powerSource.map(k => [k.toLowerCase(), k]));
+
+/** status id -> icon path, read from CONFIG.DND4E.statusEffect, so the effects use the icons the installed system has. */
+export const STATUS_IMG = (() => {
+	const start = config.findLastIndex(l => l.startsWith("DND4E.statusEffect = {"));
+	const out = {};
+	let id = null;
+	for (let i = start + 1; i < config.length && !/^\};?/.test(config[i]); i++) {
+		const key = config[i].match(/^\t([A-Za-z0-9]+):\s*\{/);
+		if (key) id = key[1];
+		const img = config[i].match(/img:\s*"([^"]+)"/);
+		if (img && id) out[id] = img[1];
+	}
+	return out;
+})();

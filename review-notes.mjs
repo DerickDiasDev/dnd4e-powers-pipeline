@@ -18,6 +18,7 @@ export const REVIEW_LEVELS = Object.freeze({
 	"range-sight": "info", // "ranged sight"
 	"power-type-unknown": "info", // the class could not be classified as class / theme / path (the importer folders by name anyway)
 	"ability-versions": "info", // the player chooses the ability: one version per ability was created
+	"effect-unresolved": "info", // some conditions or ongoing damage could not become effects (no known subject, an aftereffect, a formula): see the text
 	// warn: not (fully) automated
 	"attack-ability": "warn", // an attack ability that is not one of the six: beast, chosen, level
 	"attack-ability-choice": "warn", // the player chooses the attack ability; the first was used

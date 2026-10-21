@@ -109,7 +109,7 @@ describe("parser: damage", () => {
 	test("half damage on a miss", () => assert.equal(parse("closeBurst").miss.half, true));
 
 	test("ongoing damage with save ends", () => {
-		assert.deepEqual(parse("ongoing").hit.ongoing, [{ amount: 5, types: ["fire"], saveEnds: true }]);
+		assert.deepEqual(parse("ongoing").hit.ongoing, [{ amount: 5, types: ["fire"], saveEnds: true, subject: "unknown" }]); // no subject word: the builder treats unknown as the target for a hit or miss
 	});
 
 	test("resistance is an effect, not damage", () => {

@@ -17,7 +17,8 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ENUMS, EFFECT_BY_LABEL, POWER_SOURCE_BY_LOWER } from "./system-enums.mjs";
+import { ENUMS, EFFECT_BY_LABEL, POWER_SOURCE_BY_LOWER, STATUS_IMG } from "./system-enums.mjs";
+import { buildEffects } from "./build-effects.mjs";
 import { reviewLevel, reviewNotes } from "./review-notes.mjs";
 
 export const DB_SCHEMA_VERSION = 1;
@@ -351,6 +352,13 @@ export function convertSection(p, base, ctx) {
 		identifier: slug(`${p.name ?? base.name}${variant ? `-${variant}` : ""}${chosen ? `-${chosen}` : ""}`),
 	};
 
+	const itemId = stableId(ctx.role === "main" ? base.id : `${base.id}:${ctx.index}`);
+	// The conditions and ongoing damage the text applies become the item's own effects. Mentions of a condition ("your attacks
+	// against prone targets") are not effects and are not counted; the real gaps (no known subject, an aftereffect, a formula) are.
+	const { effects, unresolved: effectGaps } = buildEffects(p, { itemId, img: id => STATUS_IMG[id] });
+	const effectsUnresolved = effectGaps.filter(g => g.why !== "not-applied");
+	if (effectsUnresolved.length) review.push(`effect-unresolved:${effectsUnresolved.length}`);
+
 	const flags = {
 		dnd4e: {
 			import: {
@@ -370,7 +378,9 @@ export function convertSection(p, base, ctx) {
 				...(alternatives.length ? { alternatives } : {}),
 				...(extraDamage.length ? { extraDamage } : {}),
 				...(p.hit?.ongoing?.length || p.effect?.ongoing?.length ? { ongoing: [...(p.hit?.ongoing ?? []), ...(p.effect?.ongoing ?? [])] } : {}),
-				// Candidate effects for the ActiveEffect pass; not applied automatically.
+				...(effects.length ? { effects: effects.length } : {}),
+				...(effectsUnresolved.length ? { effectsUnresolved } : {}),
+				// What the text mentions, applied or not: effects were built from the applied conditions; the rest is kept for review.
 				candidates: {
 					conditions: ["hit", "miss", "effect", "aftereffect"].flatMap(k => p[k]?.conditions ?? []),
 					resistances: ["hit", "miss", "effect", "aftereffect"].flatMap(k => p[k]?.resistances ?? []),
@@ -382,11 +392,12 @@ export function convertSection(p, base, ctx) {
 	};
 
 	return {
-		_id: stableId(ctx.role === "main" ? base.id : `${base.id}:${ctx.index}`),
+		_id: itemId,
 		name: `${p.name ?? base.name}${versionSuffix(variant, chosen)}`,
 		type: "power",
 		system,
 		flags,
+		effects,
 	};
 }
 

@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENUMS } from "./system-enums.mjs";
+import { effectProblems } from "./validate-effects.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const dbDir = path.resolve(process.argv.includes("--db") ? process.argv[process.argv.indexOf("--db") + 1] : path.join(root, "out", "db"));
@@ -34,9 +35,11 @@ const inEnum = (item, field, value, list, allowEmpty = false) => {
 const FORMULA_OK = /^(?:\s|\d+(?:d\d+)?|\+|-|\*|\/|\(|\)|,|max|@(?:powBase|powMax|powerMod|wepDamage|wepCritBonus|wepAttack|lvhalf|maxMod|primaryMod|(?:str|con|dex|int|wis|cha)Mod|abilities\.(?:str|con|dex|int|wis|cha)\.mod))+$/;
 
 const ids = new Set();
+const effectIds = new Set();
 const idSet = new Set(items.map(i => i._id));
 for (const item of items) {
 	const s = item.system;
+	for (const problem of effectProblems(item, effectIds)) fail(item, `effect: ${problem}`);
 	if (item.type !== "power") fail(item, `type "${item.type}" is not power`);
 	if (!/^[A-Za-z0-9]{16}$/.test(item._id)) fail(item, "_id is not a 16-char alphanumeric id");
 	if (ids.has(item._id)) fail(item, "duplicate _id");

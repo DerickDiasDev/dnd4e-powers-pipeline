@@ -317,6 +317,33 @@ function parseDamageExpr(expr) {
 
 const typesOf = s => [...s.matchAll(new RegExp(`\\b(${TYPE_RE})\\b`, "gi"))].map(m => m[1].toLowerCase());
 
+/**
+ * Who a condition or ongoing damage lands on, from the words before it in its sentence: "the target is dazed" -> target,
+ * "you are slowed" -> self. The closest of "you" and a target word wins; with neither, the subject is unknown and no effect is built.
+ */
+export function subjectOf(before) {
+	let you = -1, target = -1;
+	for (const m of before.matchAll(/\b(?:you|yourself)\b/gi)) you = m.index;
+	for (const m of before.matchAll(/\b(?:targets?|enem(?:y|ies)|creatures?|allies|ally|it|him|her|them|each|one|that|those)\b/gi)) target = m.index;
+	if (you < 0 && target < 0) return "unknown";
+	return you > target ? "self" : "target";
+}
+
+/**
+ * Whether a sentence that names a condition really *applies* it ("the target is dazed", "you knock it prone") rather than
+ * mentioning it ("your attacks against prone targets", "the dazed condition ends", "any enemy that starts its turn ... is slowed
+ * until the stance ends"). Only applied conditions can become effects.
+ */
+export function appliesCondition(sentence) {
+	const s = sentence.replace(/\(save ends[^)]*\)/gi, "");
+	const applies = /\b(?:is|are|becomes?|be|being)\b|\bknock(?:s|ed|ing)?\b|\bmark(?:s|ed)?\b|\bgrabs?\b|\bfalls? prone\b|\bgrants? combat advantage\b/i.test(s);
+	const mentions = /\bconditions?\b|\bends?\s+(?:the|on|for)\b|\bagainst\b|\bremoves?\b|\bno longer\b|\bimmune\b|\bmarked by (?!you\b)|\bany (?:enem|creature|ally|allies)|\b(?:enemies|creatures|allies) that\b|\bthat (?:starts|ends|begins|enters|leaves)\b|\bat the (?:start|end) of (?:each|every)\b|\buntil the \w+ ends\b/i.test(s);
+	return applies && !mentions;
+}
+
+/** The part of the text before position i that belongs to the same sentence. */
+const sentenceBefore = (text, i) => text.slice(0, i).split(/[.;\n]\s*/).at(-1) ?? "";
+
 function analyze(text) {
 	const res = { damage: [], ongoing: [], conditions: [], movement: [], resistances: [] };
 	if (!text) return res;
@@ -355,33 +382,36 @@ function analyze(text) {
 		});
 	}
 	for (const m of text.matchAll(ONGOING_EQUAL_RE)) {
-		res.ongoing.push({ expr: m[2], ...parseDamageExpr(m[2]), types: typesOf(m[1]), saveEnds: /save ends/i.test(m[3] ?? "") });
+		res.ongoing.push({ expr: m[2], ...parseDamageExpr(m[2]), types: typesOf(m[1]), saveEnds: /save ends/i.test(m[3] ?? ""), subject: subjectOf(sentenceBefore(text, m.index)) });
 	}
 	for (const m of text.matchAll(EQUAL_RE)) {
 		if (/ongoing\s*$/i.test(text.slice(Math.max(0, m.index - 10), m.index))) continue;
 		res.damage.push({ expr: m[2], ...parseDamageExpr(m[2]), types: typesOf(m[1]), extra: false, equalTo: true });
 	}
 	for (const m of text.matchAll(ONGOING_RE)) {
-		res.ongoing.push({ amount: Number(m[1]), types: typesOf(m[2]), saveEnds: /save ends/i.test(m[3] ?? "") });
+		res.ongoing.push({ amount: Number(m[1]), types: typesOf(m[2]), saveEnds: /save ends/i.test(m[3] ?? ""), subject: subjectOf(sentenceBefore(text, m.index)) });
 	}
 	for (const sentence of text.split(/(?<=[.;])\s+|\n/)) {
 		if (/\b(?:if|while|whenever|unless|instead)\b/i.test(sentence)) continue;
 		const duration = parseDuration(sentence);
 		const inSentence = new Set();
+		const applied = appliesCondition(sentence);
 		for (const c of sentence.matchAll(new RegExp(`\\b(${CONDITIONS.join("|")})\\b`, "gi"))) {
 			const name = c[1].toLowerCase();
 			if (inSentence.has(name)) continue;
 			inSentence.add(name);
-			res.conditions.push({ name, kind: BOOK_CONDITIONS.has(name) ? "condition" : "effect", duration });
+			res.conditions.push({ name, kind: BOOK_CONDITIONS.has(name) ? "condition" : "effect", duration, subject: subjectOf(sentence.slice(0, c.index)), applied });
 		}
 		// Verb forms: "you mark the target until...", "you grab the target" (the participle forms are matched above).
 		for (const [name, verb] of [["marked", /\bmarks?\s+(?:the|each|one|all|any|that|it|them|him|her)\b/i], ["grabbed", /\bgrabs?\s+(?:the|each|one|all|any|that|it|them)\b/i]]) {
 			if (verb.test(sentence) && !inSentence.has(name)) {
 				inSentence.add(name);
-				res.conditions.push({ name, kind: BOOK_CONDITIONS.has(name) ? "condition" : "effect", duration });
+				res.conditions.push({ name, kind: BOOK_CONDITIONS.has(name) ? "condition" : "effect", duration, subject: "target", applied });
 			}
 		}
-		if (/grants? combat advantage/i.test(sentence)) res.conditions.push({ name: "combatAdvantage", kind: "effect", duration });
+		const grant = sentence.match(/\b(you|the target|it|he|she|each \w+|that \w+|the \w+)\s+grants?\s+combat advantage/i);
+		if (grant) res.conditions.push({ name: "combatAdvantage", kind: "effect", duration, subject: /^you$/i.test(grant[1]) ? "self" : "target", applied });
+		else if (/grants? combat advantage/i.test(sentence)) res.conditions.push({ name: "combatAdvantage", kind: "effect", duration, subject: subjectOf(sentence.slice(0, sentence.search(/grants? combat advantage/i))), applied });
 	}
 	for (const m of text.matchAll(/\b(push|pull|slide)(?:s|ed)?\s+(?:the\s+\w+\s+|it\s+|him\s+|her\s+|them\s+)?(?:up to\s+)?(\d+)\s+squares?/gi)) {
 		res.movement.push({ type: m[1].toLowerCase(), squares: Number(m[2]) });
