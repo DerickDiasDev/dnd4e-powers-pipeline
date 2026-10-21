@@ -1,6 +1,6 @@
 # dnd4e-powers-pipeline
 
-A private pipeline that turns a snapshot of the D&D 4th Edition compendium into a Foundry-ready database for the [`dnd4e`](https://github.com/EndlesNights/dnd4eBeta) system: powers, races, classes, feats, paragon paths, epic destinies, themes, backgrounds and monsters, with their conditions, bonuses and resistances as ActiveEffects. The [`dnd4e-importer`](https://github.com/DerickDiasDev/foundry-dnd4e-importer) module reads that database and imports it into a world.
+A private pipeline that turns a snapshot of the D&D 4th Edition compendium into a Foundry-ready database for the [`dnd4e`](https://github.com/EndlesNights/dnd4eBeta) system: powers, races, classes, feats, paragon paths, epic destinies, themes, backgrounds, monsters and mundane equipment, with their conditions, bonuses and resistances as ActiveEffects. The [`dnd4e-importer`](https://github.com/DerickDiasDev/foundry-dnd4e-importer) module reads that database and imports it into a world.
 
 > **No book content is in this repository.** The compendium is copyrighted. `out/` (the downloaded and generated data) and `rules/` (reference PDFs) are git-ignored and stay on your machine; the tests run on invented text. Use it for your own games.
 
@@ -13,6 +13,7 @@ A private pipeline that turns a snapshot of the D&D 4th Edition compendium into 
 | Classes | 77 | 704 `feature` items (one per class feature, with its level) + the sheet fields to fill |
 | Feats, paragon paths, epic destinies, themes, backgrounds | 3,272 / 577 / 115 / 116 / 817 | `feature` items (paths and destinies: one per feature) |
 | Monsters | 5,329 | NPC actors with their powers, traits and effects |
+| Mundane equipment | 172 | 183 `weapon`, `equipment` and `consumable` items (weapons, armour, shields, implements, ammunition) |
 
 ## Quick start
 
@@ -37,7 +38,7 @@ validate-<kind>.mjs  out/db vs the installed system   ->  pass/fail, grouped by 
 publish-db.mjs       out/db                           ->  <Foundry data>/dnd4e-db     what the importer reads
 ```
 
-Kinds: `powers`, `races`, `classes`, `options` (feats, paths, destinies, themes, backgrounds) and `monsters`. Build order matters in one place: `build-db.mjs` (powers) runs first, because races, classes, options and monsters link to the power index and `manifest.json` is rewritten by it.
+Kinds: `powers`, `races`, `classes`, `options` (feats, paths, destinies, themes, backgrounds), `monsters` and `gear` (mundane equipment). Build order matters in one place: `build-db.mjs` (powers) runs first, because races, classes, options and monsters link to the power index and `manifest.json` is rewritten by it.
 
 Two design rules run through everything:
 
@@ -53,6 +54,7 @@ out/db/race/      _index.json  races.json
 out/db/class/     _index.json  classes.json
 out/db/option/<feat|path|destiny|theme|background>/   _index.json  entries.json
 out/db/monster/   _index.json  <BOOK>.json            one file of actors per book
+out/db/gear/      _index.json  gear.json
 ```
 
 An index row is small and has what the importer lists (name, level, book, quality, notes, the ids of its items); the data files hold the Foundry document data.
@@ -93,6 +95,17 @@ A race, class, feat, path, destiny or theme is a set of `feature` items (the thi
 ## Monsters
 
 Two page layouts exist (a table under a heading per kind of action; an older stats paragraph with compact power lines); both give the same data. A monster is an **NPC actor** with the printed numbers as values (`advancedCals: false`: defences, initiative, skills and speed are the printed numbers, not recomputed), its powers as `power` items (printed attack bonus in `attack.formula`, printed damage in `hit.formula`, the critical at maximum dice, `weaponType: none`) and its traits as `feature` items of type trait (an aura keeps its size). Conditions, ongoing damage and bonuses in a power's text become effects exactly as for the player powers; the monster's own name in the text counts as the user. Skills the block does not list are half the level plus the ability modifier. Notes: `conjured`, `minion`, `hp-special`, `initiative-conjurer`, `missing-*`.
+
+## Mundane equipment
+
+Only the entries marked *Mundane* of the weapon, armour and implement tables (magic items, with their enhancement levels, properties and powers, are a later stage). Each becomes an item the sheet understands:
+
+- **Weapons** (`weapon`): `weaponType` (simple/military/superior, melee or ranged), `weaponBaseType` (so automatic proficiency finds it), hand, group, properties (Brutal keeps its number), `damageDice`, proficiency bonus and range. A double weapon is one entry with two items (`role: child` for the secondary end).
+- **Armour and shields** (`equipment`): the AC bonus, the base type (cloth, leather, hide, chain, scale, plate), check and speed penalties as the sheet expects them (negative, switched on). A shield gives its bonus to AC and Reflex. Barding is an item of type *other*.
+- **Implements** (`weapon` of type implement): the implement group as base type; the rules text of properties the system has no switch for (Accurate, Energized...) goes into the description.
+- **Ammunition** (`consumable` of type ammo) with the quantity of the pack.
+
+A name the installed system has no base type for (a few Dragon Magazine weapons) is imported with an empty base type and the info note `base-type-unknown`; the proficiency then follows the category only.
 
 ## Tests
 
