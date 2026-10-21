@@ -112,13 +112,35 @@ describe("background parser", () => {
 		const b = parseBackground(background());
 		assert.deepEqual([b.type, b.campaign, b.intro], ["Geography", "Test World", "The marsh is damp."]);
 		assert.deepEqual(b.prose, [{ heading: "", text: "Folk of the marsh are damp.\nThey like it." }]);
-		assert.equal(b.benefit, "You add Elven to your list of languages known.");
+		assert.deepEqual(b.sections, [{ label: "Benefit", text: "You add Elven to your list of languages known." }]);
 	});
 
-	test("the listing's benefit is used when the page has none", () => {
+	test("the listing's benefit is used when the page has no labelled lines", () => {
 		const b = parseBackground(background({ html: `<h1 class=player>Marsh Born</h1>Only prose.<br>` }));
-		assert.equal(b.benefit, "Add Elven to languages known.");
+		assert.deepEqual(b.sections, [{ label: "Benefit", text: "Add Elven to languages known." }]);
 		assert.equal(b.quality, "complete");
+	});
+
+	test("labelled lines (Associated Skills, Associated Languages, Benefit) are sections, each once, and out of the prose", () => {
+		const html = `<h1 class=player>Marsh Born</h1><p class=flavortext><b>Type: </b>Geography<br><b>Prerequisite: </b>Elan Heritage feat<br></p>Folk of the marsh.<br>    <i>Associated Skills: </i>Nature, Perception<br>    <i>Associated Languages: </i>Elven<br>    <i>Benefit: </i>You gain a +1 bonus to Nature checks.<br>`;
+		const b = parseBackground(background({ html }));
+		assert.deepEqual(b.sections.map(s => [s.label, s.text]), [["Associated Skills", "Nature, Perception"], ["Associated Languages", "Elven"], ["Benefit", "You gain a +1 bonus to Nature checks."]]);
+		assert.deepEqual(b.prose, [{ heading: "", text: "Folk of the marsh." }]);
+		assert.equal(b.prerequisite, "Elan Heritage feat");
+	});
+
+	test("the listing's one-line benefit is not added when the page already says it (it repeated the associated skills)", () => {
+		const html = `<h1 class=player>Marsh Born</h1>Folk of the marsh.<br>    <i>Associated Skills: </i>Nature, Perception<br>`;
+		const e = buildOption("background", parseBackground(background({ html })), []);
+		const text = e.items[0].system.description.value;
+		assert.equal((text.match(/Associated Skills:/g) ?? []).length, 1);
+		assert.equal((text.match(/Benefit:/g) ?? []).length, 0, "no invented benefit line");
+	});
+
+	test("an italic word inside the prose (a spell name) is not a section", () => {
+		const html = `<h1 class=player>Marsh Born</h1>They cast <i>blur</i> and <i>mirror image</i>.<br>`;
+		const b = parseBackground(background({ html }));
+		assert.equal(b.prose[0].text, "They cast blur and mirror image.");
 	});
 });
 
@@ -235,6 +257,24 @@ describe("real option database", { skip }, () => {
 		const all = [];
 		for (const kind of ["feat", "path", "destiny", "theme", "background"]) all.push(...(await load(kind)).entries.flatMap(e => e.items.map(i => i._id)));
 		assert.equal(new Set(all).size, all.length);
+	});
+
+	test("no description says the same label twice (Benefit, Associated Skills, ...)", async () => {
+		for (const kind of ["feat", "path", "destiny", "theme", "background"]) {
+			const repeated = [];
+			for (const e of (await load(kind)).entries) for (const item of e.items) {
+				const labels = [...item.system.description.value.matchAll(/<strong>([^<]+):<\/strong>/g)].map(m => m[1]);
+				if (new Set(labels).size !== labels.length) repeated.push(`${e.name}: ${labels.join(", ")}`);
+			}
+			assert.deepEqual(repeated.slice(0, 5), [], kind);
+		}
+	});
+
+	test("backgrounds keep their prerequisite and their associated skills", async () => {
+		const slayer = (await load("background")).entries.find(e => e.name === "Aberrant Slayer");
+		assert.equal(slayer.prerequisite, "Elan Heritage feat");
+		assert.match(slayer.items[0].system.description.value, /<strong>Associated Skills:<\/strong> Dungeoneering, Perception<\/p>/);
+		assert.doesNotMatch(slayer.items[0].system.description.value, /Benefit:/, "the listing's copy of the skills is not a benefit");
 	});
 
 	test("known options read like the book: toughness, spiral tactician", async () => {

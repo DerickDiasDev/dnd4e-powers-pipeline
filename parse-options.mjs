@@ -101,13 +101,27 @@ export function parsePath(kind, entry) {
 export function parseBackground(entry) {
 	const listing = entry.listing ?? {};
 	const html = cutAtPublished(entry.html ?? "");
-	const bg = { ...base("background", entry), type: listing.Type || null, campaign: listing.Campaign || null, intro: txt(html.match(/<\/h1>\s*<p>\s*<i>([\s\S]*?)<\/i>\s*<\/p>/i)?.[1] ?? ""), prose: [], benefit: "" };
-	const benefitHtml = html.match(/<i>\s*Benefit:?\s*<\/i>\s*([\s\S]*?)(?:<br>|$)/i)?.[1];
-	bg.benefit = txt(benefitHtml ?? "") || String(listing.Benefit ?? "").trim();
-	const body = html.replace(/^[\s\S]*?<\/h1>/i, "").replace(/<p>\s*<i>[\s\S]*?<\/i>\s*<\/p>/i, "").replace(/<p class=flavortext>[\s\S]*?<\/p>/i, "").replace(/<i>\s*Benefit:?\s*<\/i>[\s\S]*$/i, "");
-	const prose = txt(body);
-	bg.prose = prose ? [{ heading: "", text: prose }] : [];
-	if (!bg.benefit) { bg.quality = "partial"; bg.notes.push("no-benefit"); }
+	const bg = { ...base("background", entry), type: listing.Type || null, campaign: listing.Campaign || null, intro: txt(html.match(/<\/h1>\s*<p>\s*<i>([\s\S]*?)<\/i>\s*<\/p>/i)?.[1] ?? ""), prose: [], sections: [], benefit: "" };
+
+	// "Type", "Campaign Setting" and "Prerequisite" come bold in the small block under the title.
+	const info = html.match(/<p class=flavortext>([\s\S]*?)<\/p>/i)?.[1] ?? "";
+	const prerequisite = info.match(/<b>\s*Prerequisite:?\s*<\/b>\s*([^<]*)/i)?.[1];
+	if (prerequisite) bg.prerequisite = txt(prerequisite);
+
+	// The prose, and the italic labelled lines at the end of it: "Benefit", "Associated Skills", "Associated Languages".
+	const body = html.replace(/^[\s\S]*?<\/h1>/i, "").replace(/<p>\s*<i>[\s\S]*?<\/i>\s*<\/p>/i, "").replace(/<p class=flavortext>[\s\S]*?<\/p>/i, "");
+	const prose = [];
+	for (const part of body.split(/<br\s*\/?>/i)) {
+		const m = part.match(/^\s*<i>\s*([^<:]{1,40}?)\s*:\s*<\/i>\s*([\s\S]*)$/i);
+		if (m) bg.sections.push({ label: m[1].trim(), text: txt(m[2]) });
+		else prose.push(part);
+	}
+	const text = txt(prose.join("<br>"));
+	bg.prose = text ? [{ heading: "", text }] : [];
+
+	// The listing's one-line benefit stands in only when the page has no labelled lines at all (it repeats them otherwise).
+	if (!bg.sections.length && listing.Benefit) bg.sections.push({ label: "Benefit", text: String(listing.Benefit).trim() });
+	if (!bg.sections.length) { bg.quality = "partial"; bg.notes.push("no-benefit"); }
 	return bg;
 }
 

@@ -41,7 +41,6 @@ function description(kind, option) {
 	if (option.prerequisite) parts.push(`<p><strong>Prerequisite:</strong> ${esc(option.prerequisite)}</p>`);
 	for (const s of option.sections ?? []) parts.push(`<p><strong>${esc(s.label)}:</strong> ${esc(s.text)}</p>`);
 	for (const s of option.prose ?? []) parts.push(`${s.heading ? `<h3>${esc(s.heading)}</h3>` : ""}${paragraphs(s.text)}`);
-	if (option.benefit) parts.push(`<p><strong>Benefit:</strong> ${esc(option.benefit)}</p>`);
 	return parts.join("");
 }
 
