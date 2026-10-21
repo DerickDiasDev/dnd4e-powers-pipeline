@@ -54,6 +54,11 @@ export const ENUMS = {
 	autoTarget: keysOf("autoTargetModes"),
 	abilities: keysOf("abilities"),
 	defences: keysOf("defensives"),
+	sizes: keysOf("actorSizes"),
+	origins: keysOf("creatureOrigin"),
+	skills: keysOf("skills"),
+	spoken: keysOf("spoken"),
+	featureTypes: keysOf("featureTypes"),
 	// rangeType's nested objects make a one-tab scan useless; these are the keys rangeData() in item.mjs handles.
 	rangeType: ["weapon", "melee", "touch", "reach", "range", "closeBurst", "closeBlast", "rangeBurst", "rangeBlast", "wall", "personal", "special"],
 };
