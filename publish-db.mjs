@@ -23,11 +23,13 @@ if (path.resolve(from) === to || to.startsWith(path.resolve(from) + path.sep)) {
 await mkdir(to, { recursive: true });
 await rm(path.join(to, "power"), { recursive: true, force: true });
 await rm(path.join(to, "race"), { recursive: true, force: true });
+await rm(path.join(to, "class"), { recursive: true, force: true });
 await rm(path.join(to, "manifest.json"), { force: true });
 await cp(path.join(from, "power"), path.join(to, "power"), { recursive: true });
 await cp(path.join(from, "race"), path.join(to, "race"), { recursive: true }).catch(() => console.log("(no race/ in out/db: run build-races.mjs)"));
+await cp(path.join(from, "class"), path.join(to, "class"), { recursive: true }).catch(() => console.log("(no class/ in out/db: run build-classes.mjs)"));
 await cp(path.join(from, "manifest.json"), path.join(to, "manifest.json"));
 
 const manifest = JSON.parse(await readFile(path.join(to, "manifest.json"), "utf8"));
-console.log(`Published ${manifest.powers} powers (${manifest.items} items, ${manifest.files} files)${manifest.races ? ` and ${manifest.races.count} races` : ""} to ${to}`);
+console.log(`Published ${manifest.powers} powers (${manifest.items} items, ${manifest.files} files)${manifest.races ? `, ${manifest.races.count} races` : ""}${manifest.classes ? `, ${manifest.classes.count} classes` : ""} to ${to}`);
 console.log("In Foundry: the importer reads the folder named in its 'Database folder' setting (default: dnd4e-db).");

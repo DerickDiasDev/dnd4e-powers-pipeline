@@ -23,7 +23,8 @@ const flatLang = flatten(lang);
 
 /** Top-level entries (one tab of indentation) of `DND4E.<name> = { ... };` as [key, rawValueLine] pairs. */
 function entriesOf(name) {
-	const start = config.findIndex(l => l.startsWith(`DND4E.${name} = {`));
+	// Later assignments win in the config (weaponProficiencies is defined twice), so read the last one.
+	const start = config.findLastIndex(l => l.startsWith(`DND4E.${name} = {`));
 	if (start < 0) throw new Error(`DND4E.${name} not found in config.mjs`);
 	const out = [];
 	for (let i = start + 1; i < config.length && !/^\};?/.test(config[i]); i++) {
@@ -59,6 +60,8 @@ export const ENUMS = {
 	skills: keysOf("skills"),
 	spoken: keysOf("spoken"),
 	featureTypes: keysOf("featureTypes"),
+	armourProf: keysOf("profArmor"),
+	weaponProf: keysOf("weaponProficiencies"),
 	// rangeType's nested objects make a one-tab scan useless; these are the keys rangeData() in item.mjs handles.
 	rangeType: ["weapon", "melee", "touch", "reach", "range", "closeBurst", "closeBlast", "rangeBurst", "rangeBlast", "wall", "personal", "special"],
 };
