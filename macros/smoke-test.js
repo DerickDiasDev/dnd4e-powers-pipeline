@@ -168,6 +168,11 @@ await run("C features", "a feature's saving-throw and defence bonuses", async ()
 });
 
 /* ======================================================= D. patches */
+/**
+ * A fresh actor made from the source data with an update ("system.a.b": value) merged in. Not updateSource + prepareData on the same
+ * actor: the system's derived data adds to itself (value += bonus), so preparing twice counts every bonus twice.
+ */
+const patched = (data, update) => make(data, foundry.utils.expandObject(update));
 const raceModule = await import(`/modules/${MODULE_ID}/scripts/race.mjs`);
 const classModule = await import(`/modules/${MODULE_ID}/scripts/class.mjs`);
 
@@ -175,11 +180,9 @@ await run("D patches", "the elf", async () => {
 	const index = await get("race/_index.json");
 	const row = index.find(r => r.name === "Elf");
 	const entry = (await get("race/races.json")).find(e => e._id === row._id);
-	const actor = make(pc());
-	const before = actor.system.skills.nat.total;
-	const { update } = raceModule.racePatch(actor.system, entry.apply);
-	actor.updateSource(update);
-	actor.prepareData();
+	const plain = make(pc());
+	const before = plain.system.skills.nat.total;
+	const actor = patched(pc(), raceModule.racePatch(plain.system, entry.apply).update);
 	eq("D patches", "elf: race, size, vision", [actor.system.details.race, actor.system.details.size, actor.system.senses.basic], ["Elf", "med", "lv"]);
 	eq("D patches", "elf: speed 7", actor.system.movement.walk.value, 7);
 	eq("D patches", "elf: Nature and Perception +2 (racial)", [actor.system.skills.nat.total - before, actor.system.skills.prc.total - make(pc()).system.skills.prc.total], [2, 2]);
@@ -189,20 +192,19 @@ await run("D patches", "the elf", async () => {
 await run("D patches", "the human's racial defence bonuses", async () => {
 	const row = (await get("race/_index.json")).find(r => r.name === "Human");
 	const entry = (await get("race/races.json")).find(e => e._id === row._id);
-	const actor = make(pc());
-	const before = ["fort", "ref", "wil"].map(k => actor.system.defences[k].value);
-	actor.updateSource(raceModule.racePatch(actor.system, entry.apply).update);
-	actor.prepareData();
+	const plain = make(pc());
+	const before = ["fort", "ref", "wil"].map(k => plain.system.defences[k].value);
+	const actor = patched(pc(), raceModule.racePatch(plain.system, entry.apply).update);
 	eq("D patches", "human: +1 Fortitude, Reflex and Will", ["fort", "ref", "wil"].map((k, i) => actor.system.defences[k].value - before[i]), [1, 1, 1]);
 });
 
 await run("D patches", "the knight (a fighter build)", async () => {
 	const row = (await get("class/_index.json")).find(r => r.name === "Fighter (Knight)");
 	const entry = (await get("class/classes.json")).find(e => e._id === row._id);
-	const actor = make(pc({ abilities: { con: { value: 14 } } }));
-	const fortBefore = actor.system.defences.fort.value;
-	actor.updateSource(classModule.classPatch(actor.system, entry.apply).update);
-	actor.prepareData();
+	const source = pc({ abilities: { con: { value: 14 } } });
+	const plain = make(source);
+	const fortBefore = plain.system.defences.fort.value;
+	const actor = patched(source, classModule.classPatch(plain.system, entry.apply).update);
 	eq("D patches", "knight: primary ability Strength, class 'Fighter (Knight)'", [actor.system.details.primaryAbility, actor.system.details.class], ["str", "Fighter (Knight)"]);
 	eq("D patches", "knight: 15 + Constitution 14 = 29 hit points at level 1", actor.system.attributes.hp.max, 29);
 	eq("D patches", "knight: 9 + Constitution modifier (+2) = 11 healing surges", actor.system.details.surges.max, 11);
