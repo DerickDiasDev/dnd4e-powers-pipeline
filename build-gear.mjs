@@ -57,6 +57,15 @@ const baseKey = (table, name) => {
 	return alias && [...(BASE_TABLES[table]?.values() ?? [])].includes(alias) ? alias : "";
 };
 
+/** A weapon name -> its weapon type and base type key in the system ("Longsword" -> militaryM / longsword), or null. */
+export function findBase(name) {
+	for (const type of Object.keys(BASE_TABLES)) {
+		const key = baseKey(type, name);
+		if (key) return { type, key };
+	}
+	return null;
+}
+
 const source = e => ({ book: e.sourceCode ?? "", page: "", custom: "", revision: 1 });
 const importFlags = (e, role, extra = {}) => ({
 	dnd4e: { import: { origin: "iws-4e-compendium", kind: "gear", id: e.id, sourceCode: e.sourceCode, schema: GEAR_SCHEMA_VERSION, role, gearKind: e.kind, ...extra } },

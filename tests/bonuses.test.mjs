@@ -282,7 +282,7 @@ describe("effect validation of changes", () => {
 
 	test("a feature's effect must transfer, and a power's must not", () => {
 		const f = { type: "feature", effects: [{ _id: "ABCDEFGHIJKLMNOP", name: "x", transfer: false, statuses: [], system: { durationType: "", powerEffectType: "misc", dots: [], keywords: [], changes: [{ key: "system.defences.wil.feat", type: "upgrade", value: "1", priority: null }] } }] };
-		assert.match(effectProblems(f).join("\n"), /feature's effect must transfer/);
+		assert.match(effectProblems(f).join("\n"), /effect of a feature or an item must transfer/);
 	});
 });
 

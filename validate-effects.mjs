@@ -41,8 +41,8 @@ export function effectProblems(item, seenIds = new Set()) {
 		seenIds.add(e._id);
 		if (!e.name) problems.push("effect without a name");
 		// A power's effects are applied to targets when it is used; a feature's stay on the character while it is owned.
-		const transfers = item.type === "feature";
-		if (e.transfer !== transfers) problems.push(transfers ? "a feature's effect must transfer to its owner" : "a power's effect must not transfer to its owner");
+		const transfers = ["feature", "equipment", "weapon"].includes(item.type);
+		if (e.transfer !== transfers) problems.push(transfers ? "an effect of a feature or an item must transfer to its owner" : "a power's effect must not transfer to its owner");
 		if (e.img !== undefined && !ICONS.has(e.img)) problems.push(`effect img "${e.img}" is not a status icon of the system`);
 		for (const s of e.statuses ?? []) if (!ENUMS.statusEffects.includes(s)) problems.push(`status "${s}" is not one of the system's statuses`);
 		const sys = e.system ?? {};
