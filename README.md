@@ -47,6 +47,9 @@ When the text lets the player choose the ability ("Strength or Wisdom vs. AC", o
 ## Classes
 `parse-classes.mjs` -> `out/parsed/class.json`, `build-classes.mjs` -> `out/db/class/_index.json` + `classes.json`, `validate-classes.mjs`. A class is a set of `feature` items (the class + one per class feature, with its level), an `apply` block (class name, primary ability = first key ability, hit points, surges base, defence bonuses, fixed trained skills, armour and weapon proficiencies; empty for hybrid classes) and the powers its features name, found in the power DB (`granted` for "You gain the X power", `option` when several cards are offered). Features are cut where a power card begins; the cards themselves are not copied.
 
+## Character options
+`parse-options.mjs` -> `out/parsed/option-<kind>.json`, `build-options.mjs` -> `out/db/option/<kind>/_index.json` + `entries.json` (same index shape for every kind), `validate-options.mjs`. Kinds: `feat` (3,272), `path` (paragon paths), `destiny` (epic destinies), `theme`, `background`. Each is a `feature` item (featureType feat/path/destiny/theme/background) with its prerequisite, tier/level and text; paths and destinies add one item per feature with its level. `apply` carries the path or destiny name for the sheet's own fields. `powers` link to the power DB: a path or destiny gives its powers (a choice where two share a level), a theme gives its feature power, a feat the powers its page prints.
+
 ## Tests (`npm test`, ~2 s, no Foundry needed)
 
 | File | What it checks |
