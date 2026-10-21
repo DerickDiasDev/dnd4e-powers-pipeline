@@ -9,6 +9,7 @@ parse-powers.mjs   power HTML                        -> out/parsed/power.json   
 build-db.mjs       intermediate schema + system enums -> out/db/                  (PowerData items, grouped by book)
 validate-db.mjs    out/db vs the installed system's enums (static)
 macros/validate-powers.js   run inside Foundry: validates items against the real PowerData model
+macros/smoke-test.js         run inside Foundry (read-only, creates nothing): monsters, effects, feature bonuses and the race/class patches against the real system
 build-review.mjs   out/parsed                        -> out/review/index.html    (local viewer: original vs parsed)
 ```
 
