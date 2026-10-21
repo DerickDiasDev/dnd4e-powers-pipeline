@@ -1,6 +1,6 @@
 # dnd4e-powers-pipeline
 
-A private pipeline that turns a snapshot of the D&D 4th Edition compendium into a Foundry-ready database for the [`dnd4e`](https://github.com/EndlesNights/dnd4eBeta) system: powers, races, classes, feats, paragon paths, epic destinies, themes, backgrounds, monsters and mundane equipment, with their conditions, bonuses and resistances as ActiveEffects. The [`dnd4e-importer`](https://github.com/DerickDiasDev/foundry-dnd4e-importer) module reads that database and imports it into a world.
+A private pipeline that turns a snapshot of the D&D 4th Edition compendium into a Foundry-ready database for the [`dnd4e`](https://github.com/EndlesNights/dnd4eBeta) system: powers, races, classes, feats, paragon paths, epic destinies, themes, backgrounds, monsters, mundane equipment and magic items, with their conditions, bonuses and resistances as ActiveEffects. The [`dnd4e-importer`](https://github.com/DerickDiasDev/foundry-dnd4e-importer) module reads that database and imports it into a world.
 
 > **No book content is in this repository.** The compendium is copyrighted. `out/` (the downloaded and generated data) and `rules/` (reference PDFs) are git-ignored and stay on your machine; the tests run on invented text. Use it for your own games.
 
@@ -13,6 +13,7 @@ A private pipeline that turns a snapshot of the D&D 4th Edition compendium into 
 | Classes | 77 | 704 `feature` items (one per class feature, with its level) + the sheet fields to fill |
 | Feats, paragon paths, epic destinies, themes, backgrounds | 3,272 / 577 / 115 / 116 / 817 | `feature` items (paths and destinies: one per feature) |
 | Monsters | 5,329 | NPC actors with their powers, traits and effects |
+| Magic items | 3,245 | one item each, with its levels (tiers), enhancement bonus and price |
 | Mundane equipment | 172 | 183 `weapon`, `equipment` and `consumable` items (weapons, armour, shields, implements, ammunition) |
 
 ## Quick start
@@ -38,7 +39,7 @@ validate-<kind>.mjs  out/db vs the installed system   ->  pass/fail, grouped by 
 publish-db.mjs       out/db                           ->  <Foundry data>/dnd4e-db     what the importer reads
 ```
 
-Kinds: `powers`, `races`, `classes`, `options` (feats, paths, destinies, themes, backgrounds), `monsters` and `gear` (mundane equipment). Build order matters in one place: `build-db.mjs` (powers) runs first, because races, classes, options and monsters link to the power index and `manifest.json` is rewritten by it.
+Kinds: `powers`, `races`, `classes`, `options` (feats, paths, destinies, themes, backgrounds), `monsters`, `gear` (mundane equipment) and `magic`. Build order matters in one place: `build-db.mjs` (powers) runs first, because races, classes, options and monsters link to the power index and `manifest.json` is rewritten by it.
 
 Two design rules run through everything:
 
@@ -55,6 +56,7 @@ out/db/class/     _index.json  classes.json
 out/db/option/<feat|path|destiny|theme|background>/   _index.json  entries.json
 out/db/monster/   _index.json  <BOOK>.json            one file of actors per book
 out/db/gear/      _index.json  gear.json
+out/db/magic/     _index.json  <BOOK>.json            one file of entries per book
 ```
 
 An index row is small and has what the importer lists (name, level, book, quality, notes, the ids of its items); the data files hold the Foundry document data.
@@ -98,7 +100,7 @@ Two page layouts exist (a table under a heading per kind of action; an older sta
 
 ## Mundane equipment
 
-Only the entries marked *Mundane* of the weapon, armour and implement tables (magic items, with their enhancement levels, properties and powers, are a later stage). Each becomes an item the sheet understands:
+Only the entries marked *Mundane* of the weapon, armour and implement tables (magic items are the next section). Each becomes an item the sheet understands:
 
 - **Weapons** (`weapon`): `weaponType` (simple/military/superior, melee or ranged), `weaponBaseType` (so automatic proficiency finds it), hand, group, properties (Brutal keeps its number), `damageDice`, proficiency bonus and range. A double weapon is one entry with two items (`role: child` for the secondary end).
 - **Armour and shields** (`equipment`): the AC bonus, the base type (cloth, leather, hide, chain, scale, plate), check and speed penalties as the sheet expects them (negative, switched on). A shield gives its bonus to AC and Reflex. Barding is an item of type *other*.
@@ -106,6 +108,18 @@ Only the entries marked *Mundane* of the weapon, armour and implement tables (ma
 - **Ammunition** (`consumable` of type ammo) with the quantity of the pack.
 
 A name the installed system has no base type for (a few Dragon Magazine weapons) is imported with an empty base type and the info note `base-type-unknown`; the proficiency then follows the category only.
+
+## Magic items
+
+Every `mihead` page of the weapon, armour, implement and item tables. The title gives level and rarity, the flavour line and a table of levels (level, enhancement bonus, price) come next, then stat lines and the Property/Power sections. An item that exists at several levels is **one entry with `tiers`**; the item data is built at the first tier and the importer patches level, price and enhancement (`flags.dnd4e.import.enhancePath`) for the tier the player picks.
+
+- **Weapons and implements** (`weapon`): enhancement on `enhance`. The page names a group ("Maces", "Any melee"), not a weapon, so there are no damage dice; the index row's `base` says which weapons fit, and the importer can base the item on a mundane weapon. A page that names one weapon ("Longsword") gets its type and base type.
+- **Armour** (`equipment`): enhancement on `armour.enhance`; when the page names one kind of armour the base bonus and penalties of that armour are filled in. Shields are `arms`.
+- **Slot items** (head, neck, arms, hands, feet, waist, ring), **wondrous items** (equipment of type other, so they can be equipped) and **alternative rewards** (boons, gifts, secrets...) are `equipment`. Consumables are `consumable`; familiars, mounts, companions, lairs and item sets are `loot`.
+- **Effects:** plain standing bonuses in a Property section become transferring effects with `equippedRec`, so the system suppresses them while the item is not equipped. A property whose numbers change with the level, or that is conditional, stays in the text.
+- **Powers** stay in the description (their numbers change with the level); the item records their headings in `flags.dnd4e.import.powers`.
+
+Not yet: the masterwork armour, the pact weapons and the adventuring gear of the item table (they use the mundane page layout).
 
 ## Tests
 
