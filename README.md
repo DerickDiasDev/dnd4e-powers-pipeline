@@ -41,6 +41,9 @@ When the text lets the player choose the ability ("Strength or Wisdom vs. AC", o
 
 `flags.dnd4e.import` also holds what PowerData cannot express yet: `review` notes, `extraDamage`, `ongoing`, `scaling`, and `candidates` (conditions, resistances, forced movement) for a future ActiveEffect pass.
 
+## Races
+`parse-races.mjs` -> `out/parsed/race.json`, `build-races.mjs` -> `out/db/race/_index.json` + `races.json`, `validate-races.mjs` checks them against the system's enums. A race is a set of `feature` items (the race + one per trait), an `apply` block (what the importer writes into the actor: size, origin, vision, speed, languages, skill and defence bonuses) and the racial powers found in the power DB (`granted` when the traits name them). Ability score bonuses are kept as text only. `npm run pipeline` runs everything.
+
 ## Tests (`npm test`, ~2 s, no Foundry needed)
 
 | File | What it checks |

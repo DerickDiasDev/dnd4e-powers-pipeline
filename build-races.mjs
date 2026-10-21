@@ -54,7 +54,7 @@ function summary(race) {
 	return lines.join("");
 }
 
-const featureItem = (race, { key, name, html, role, extra = {} }) => ({
+const featureItem = (race, { key, name, html, role, section, extra = {} }) => ({
 	_id: stableId(`${race.id}:${key}`),
 	name,
 	type: "feature",
@@ -70,7 +70,7 @@ const featureItem = (race, { key, name, html, role, extra = {} }) => ({
 	},
 	flags: {
 		dnd4e: {
-			import: { origin: "iws-4e-compendium", kind: "race", id: race.id, sourceCode: race.sourceCode, schema: RACE_SCHEMA_VERSION, quality: race.quality, role, race: race.name },
+			import: { origin: "iws-4e-compendium", kind: "race", id: race.id, sourceCode: race.sourceCode, schema: RACE_SCHEMA_VERSION, quality: race.quality, role, ...(section !== undefined ? { section } : {}), race: race.name },
 		},
 	},
 });
@@ -84,7 +84,7 @@ export function buildRace(race, powerRows = []) {
 
 	const main = featureItem(race, { key: "main", name: race.name, role: "main", html: summary(race) });
 	const items = [main];
-	race.traits.forEach((trait, i) => items.push(featureItem(race, { key: `trait:${i}`, name: trait.name, role: "trait", html: paragraphs(trait.text) })));
+	race.traits.forEach((trait, i) => items.push(featureItem(race, { key: `trait:${i}`, name: trait.name, role: "trait", section: i, html: paragraphs(trait.text) })));
 	main.flags.dnd4e.import.bundle = main._id;
 	for (const item of items) item.flags.dnd4e.import.bundle = main._id;
 

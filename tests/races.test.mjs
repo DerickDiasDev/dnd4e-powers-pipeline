@@ -128,6 +128,7 @@ describe("race builder", () => {
 			assert.equal(item.flags.dnd4e.import.kind, "race");
 		}
 		assert.equal(e._id, e.items[0]._id);
+		assert.deepEqual(e.items.map(i => [i.flags.dnd4e.import.role, i.flags.dnd4e.import.section]), [["main", undefined], ["trait", 0], ["trait", 1], ["trait", 2]], "the section tells the traits apart for the importer's duplicate check");
 		assert.match(e.items[0].system.description.value, /<strong>Speed:<\/strong> 5 squares/);
 		assert.match(e.items[0].system.description.value, /Tiny tricksters/);
 		assert.equal(new Set(e.items.map(i => i._id)).size, 4);
