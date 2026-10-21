@@ -147,7 +147,12 @@ export function parseRace(entry) {
 /** The flavour text after the traits and powers: headed paragraphs ("Physical qualities", "Playing a ..."). */
 function prose(html) {
 	const start = html.search(/<\/span>\s*(?=<h3>)|<h3>/i);
-	const body = start >= 0 ? html.slice(start) : html.replace(/^[\s\S]*?<\/h1>/i, "");
+	// Without headed sections the text is whatever is left once the title, tagline and traits block (already parsed) are removed.
+	const body = start >= 0 ? html.slice(start) : html
+		.replace(/<blockquote>[\s\S]*?<\/blockquote>/i, "")
+		.replace(/<p class=flavor><b>RACIAL TRAITS<\/b><\/p>/i, "")
+		.replace(/^[\s\S]*?<\/h1>/i, "")
+		.replace(/^\s*<i>[\s\S]*?<\/i>/i, "");
 	const out = [];
 	for (const section of body.split(/<h3>/i)) {
 		const m = section.match(/^([\s\S]*?)<\/h3>([\s\S]*)$/i);

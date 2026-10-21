@@ -105,6 +105,16 @@ describe("race parser", () => {
 		assert.match(r.description[0].text, /small and damp\.\nThey live in marshes\./);
 	});
 
+	test("a race page with no headed sections: the description is the closing text, never the traits block again", () => {
+		const p = page({ traits: TRAITS });
+		p.html = p.html.replace(/<h3>PHYSICAL[\s\S]*$/, "<b>Zorbling Names</b>: Blub, Glub<br><p class=publishedIn>Published in Test Book, page(s) 1.</p>");
+		const r = parseRace(p);
+		assert.deepEqual(r.description, [{ heading: "", text: "Zorbling Names: Blub, Glub\nPublished in Test Book, page(s) 1." }]);
+		const text = buildRace(r, POWERS).items[0].system.description.value;
+		assert.equal((text.match(/RACIAL TRAITS|Marsh Step|Average Height/g) ?? []).length, 0);
+		assert.equal((text.match(/<h3>/g) ?? []).length, 0, "no empty or invented heading");
+	});
+
 	test("a sub-race without a traits block is description-only, with the size from the listing", () => {
 		const r = parseRace({ id: "race901", listing: { Name: "Marsh Zorbling", Size: "Small", Origin: "Fey", SourceBook: "TST" }, html: "<h1 class=player>Marsh Zorbling</h1><br>Lives deeper in the marsh.<br><h3>Roleplaying</h3>Be damp." });
 		assert.equal(r.quality, "description-only");

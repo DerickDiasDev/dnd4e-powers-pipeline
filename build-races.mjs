@@ -50,7 +50,7 @@ function summary(race) {
 	row("Vision", VISION_NAMES[race.vision]);
 	row("Languages", race.languages?.text);
 	row("Skill bonuses", race.skillBonusesText);
-	for (const section of race.description) lines.push(`<h3>${esc(section.heading || race.name)}</h3>${paragraphs(section.text)}`);
+	for (const section of race.description) lines.push(`${section.heading ? `<h3>${esc(section.heading)}</h3>` : ""}${paragraphs(section.text)}`);
 	return lines.join("");
 }
 
