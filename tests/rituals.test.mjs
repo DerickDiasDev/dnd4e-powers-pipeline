@@ -89,6 +89,29 @@ describe("building", () => {
 		assert.match(html, /<table><tr><th>Result<\/th><th>Effect<\/th><\/tr><tr><td>9<\/td><td>Bad<\/td><\/tr><\/table>/);
 	});
 
+	test("the first paragraph is the chat flavour and is not repeated in the description, so the chat card says it once", () => {
+		const e = buildRitual(parseRitual(page()));
+		const s = e.items[0].system;
+		assert.equal(s.description.chat, "You ward a zorb.");
+		assert.doesNotMatch(s.description.value, /You ward a zorb/);
+		assert.match(s.description.value, /More text\./);
+		assert.match(s.description.value, /Component Cost/);
+		assert.equal(s.autoCard, true);
+	});
+
+	test("a ritual whose page is a single paragraph and no stat to add keeps it as the description, without the auto card", () => {
+		const r = parseRitual(page({ skill: "Arcana", duration: "8 hours", body: "<p>Only this.</p>" }));
+		r.componentCost = null;
+		const s = buildRitual(r).items[0].system;
+		assert.deepEqual([s.description.chat, s.autoCard], ["", false]);
+		assert.match(s.description.value, /Only this\./);
+	});
+
+	test("a ritual that starts with a table has no summary", () => {
+		const r = parseRitual(page({ body: `<table><tr><th>A</th><th>B</th><tr><td>1<td>2</table><p>After.</p>` }));
+		assert.equal(buildRitual(r).items[0].system.description.chat, "");
+	});
+
 	test("ids are deterministic and what is built validates; the validator rejects a bad category and unit", () => {
 		const a = buildRitual(parseRitual(page())), b = buildRitual(parseRitual(page()));
 		assert.equal(a._id, b._id);

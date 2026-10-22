@@ -21,8 +21,18 @@ export const RITUAL_SCHEMA_VERSION = 1;
 const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 const stableId = seed => createHash("sha1").update(`dnd4e:ritual:${seed}`).digest("base64").replace(/[^A-Za-z0-9]/g, "").slice(0, 16);
 
-/** The page as HTML: stats, text, tables (consecutive table lines make one table, the first row its header). */
-export function describeHtml(r) {
+/**
+ * The first paragraph of the text, which says what the ritual does in a few lines: it goes to the chat description, the flavour
+ * the system puts at the top of the ritual's chat card. Without it the card shows the whole description twice (the system shows
+ * the description as flavour when there is no chat description, and again as the details).
+ */
+export const summaryOf = r => (r.body[0] && !r.body[0].table && !r.body[0].heading ? r.body[0].text : null);
+
+/**
+ * The page as HTML: stats, text, tables (consecutive table lines make one table, the first row its header).
+ * @param {{skipSummary?: boolean}} [options] leave out the paragraph that `summaryOf` returns
+ */
+export function describeHtml(r, { skipSummary = false } = {}) {
 	const out = [];
 	if (r.flavor) out.push(`<p><em>${esc(r.flavor)}</em></p>`);
 	// The sheet already shows the category, level, cast time, duration and market price from its own fields, and rolls the key skill:
@@ -37,7 +47,7 @@ export function describeHtml(r) {
 	for (const [label, value] of stats) if (value) out.push(`<p><strong>${label}:</strong> ${esc(value)}</p>`);
 	let table = null;
 	const flush = () => { if (table) { out.push(`<table>${table.map((cells, i) => `<tr>${cells.map(c => `<${i ? "td" : "th"}>${esc(c)}</${i ? "td" : "th"}>`).join("")}</tr>`).join("")}</table>`); table = null; } };
-	for (const line of r.body) {
+	for (const line of skipSummary && summaryOf(r) ? r.body.slice(1) : r.body) {
 		if (line.table) { (table ??= []).push(line.text.split(" | ")); continue; }
 		flush();
 		out.push(line.heading ? `<h3>${esc(line.text)}</h3>` : `<p>${esc(line.text)}</p>`);
@@ -51,12 +61,18 @@ export function buildRitual(r) {
 	const notes = [...r.notes];
 	if (r.skills.length > 1) notes.push("skill-choice");
 	const skill = r.skills[0] ?? "arc";
+	// The summary is the chat flavour; the description keeps the rest, so the chat card does not say everything twice.
+	const summary = summaryOf(r);
+	const rest = describeHtml(r, { skipSummary: Boolean(summary) });
+	// A ritual with nothing after its first paragraph has no details to show apart from the flavour: one description, no auto card.
+	const nothingElse = !rest || rest === (r.flavor ? `<p><em>${esc(r.flavor)}</em></p>` : "");
 	const item = {
 		_id: stableId(`${r.id}:main`),
 		name: r.name,
 		type: "ritual",
 		system: {
-			description: { value: describeHtml(r) },
+			description: nothingElse ? { value: describeHtml(r), chat: "" } : { value: rest, chat: summary ?? "" },
+			autoCard: !nothingElse,
 			source: { book: r.sourceCode ?? "", page: "", custom: "", revision: 1 },
 			level: r.level,
 			category: r.category,
