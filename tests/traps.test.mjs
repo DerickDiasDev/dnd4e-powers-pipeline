@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseHeader, parseTrap, splitSections, trapLines, withoutHeader } from "../parse-traps.mjs";
 import { buildTrap, describeHtml, indexRow } from "../build-traps.mjs";
+import { extractPowers } from "../trap-powers.mjs";
 import { validateTraps } from "../validate-traps.mjs";
 
 const published = `<p class=publishedIn>Published in Test Book, page(s) 1.</p>`;
@@ -49,7 +50,8 @@ describe("parsing", () => {
 		assert.deepEqual([t.kind, t.level, t.group, t.role, t.xp], ["trap", 3, "elite", "warder", 150]);
 		assert.deepEqual(t.sources, ["TST", "TST2"]);
 		assert.equal(t.body[0], "A pit.");
-		assert.ok(t.body.includes("Attack: +4 vs. Reflex"));
+		assert.ok(!t.body.includes("Attack: +4 vs. Reflex"), "the attack is a power, not text");
+		assert.deepEqual(t.powers.map(p => [p.name, p.attack.bonus, p.attack.defence]), [["Zorb Pit (Elite)", 4, "ref"]]);
 		assert.deepEqual(t.notes, ["hp-none"]);
 	});
 
@@ -107,13 +109,44 @@ describe("building", () => {
 		const a = buildTrap(t), b = buildTrap(t);
 		assert.equal(a._id, b._id);
 		const row = indexRow(a, t, "tst.json");
-		assert.deepEqual([row.level, row.role, row.group, row.file, row.powers, row.traits], [3, "warder", "elite", "tst.json", 0, 0]);
+		assert.deepEqual([row.level, row.role, row.group, row.file, row.powers, row.traits], [3, "warder", "elite", "tst.json", 1, 0]);
 		assert.equal(validateTraps([a], [row]).size, 0);
 		a.system.attributes.hp.max = 5;
 		assert.match([...validateTraps([a], [row]).keys()].join(), /hit points/, "no hit points (none) but a maximum");
 		a.system.attributes.hp.none = false;
 		a.system.attributes.hp.value = 5;
 		assert.equal(validateTraps([a], [row]).size, 0, "hit points that are on, at least 1 and full, are fine");
+	});
+});
+
+describe("the attacks of a trap are powers on the actor", () => {
+	const lines = ["A pit.", "Trigger", "A creature enters.", "Attack", "Opportunity Action Close burst 2", "Target: Each creature in burst", "Attack: +9 vs. Will", "Hit: 2d6 + 3 fire damage, and the target is dazed (save ends).", "Miss: Half damage.", "Special: Once a round.", "The pit stays open."];
+
+	test("the block that follows an Attack title: action, range, target, bonus, damage; the prose around it stays", () => {
+		const { powers, body } = extractPowers(lines, "Zorb Pit");
+		assert.deepEqual(body, ["A pit.", "Trigger", "A creature enters.", "The pit stays open."]);
+		const [p] = powers;
+		assert.deepEqual([p.name, p.action, p.usage, p.attack.range, p.attack.bonus, p.attack.defence, p.attack.damage], ["Zorb Pit", "opportunity", "atwill", "Close burst 2", 9, "wil", "2d6+3"]);
+		const item = buildTrap({ id: "trap910", name: "Zorb Pit", kind: "trap", level: 3, group: "standard", role: "", xp: 100, hp: null, initiative: null, defences: null, detection: "", countermeasures: "", body, powers, sourceCode: "TST", notes: [] }).items[0];
+		assert.deepEqual([item.type, item.system.actionType, item.system.rangeType, item.system.area, item.system.attack.formula, item.system.attack.def, item.system.hit.formula, item.system.miss.halfDamage], ["power", "opportunity", "closeBurst", "2", "9", "wil", "2d6 + 3", true]);
+		assert.equal(item.flags.dnd4e.import.kind, "trap-power");
+	});
+
+	test("the page may leave out the word Action, number its attacks and give them keywords; two powers of one name are numbered", () => {
+		const text = ["Attack 1 * Necrotic", "Immediate Interrupt Ranged 10", "Attack: +5 vs. AC", "Hit: 1d6 damage.", "Attack 2", "Standard Action Melee", "Attack: +5 vs. AC", "Hit: 2d6 damage."];
+		const { powers } = extractPowers(text, "Zorb");
+		assert.deepEqual(powers.map(p => [p.name, p.action, p.keywords, p.attack.range]), [["Zorb (attack 1)", "interrupt", ["Necrotic"], "Ranged 10"], ["Zorb (attack 2)", "standard", [], "Melee 1"]]);
+	});
+
+	test("triggered actions are powers with the monsters' headings", () => {
+		const text = ["Triggered Actions", "ᗕ Silver Fire (radiant) ✦ Daily", "Trigger: The chest is opened.", "Attack: Close burst 3 (each undead in the burst); +11 vs. Fortitude", "Hit: 2d6 + 5 radiant damage."];
+		const { powers, body } = extractPowers(text, "Brazier");
+		assert.deepEqual(body, []);
+		assert.deepEqual(powers.map(p => [p.name, p.usage, p.keywords, p.attack.bonus, p.attack.range]), [["Silver Fire", "daily", ["radiant"], 11, "Close burst 3"]]);
+	});
+
+	test("an Attack title with nothing after it stays in the text", () => {
+		assert.deepEqual(extractPowers(["Attack", "Prose."], "Zorb"), { powers: [], body: ["Attack", "Prose."] });
 	});
 });
 
@@ -128,6 +161,9 @@ describe("the real database", () => {
 		assert.equal(validateTraps(actors, index).size, 0);
 		assert.equal(index.length, actors.length);
 		assert.ok(actors.length >= 770);
+		assert.ok(actors.filter(a => a.items.length).length >= 500, "most traps have their attacks as powers");
+		const ice = actors.find(a => a.name === "Ice Cell");
+		assert.deepEqual([ice.items[0].system.attack.formula, ice.items[0].system.attack.def, ice.items[0].system.rangeType], ["8", "ref", "melee"]);
 		const pit = actors.find(a => a.name === "False-Floor Pit (Elite)");
 		assert.deepEqual([pit.type, pit.system.details.level, pit.system.details.exp, pit.system.details.role], ["Hazard", 1, 200, { primary: "trap", secondary: "elite", tertiary: "warder" }]);
 	});

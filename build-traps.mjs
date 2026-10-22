@@ -5,7 +5,8 @@
  * A trap is a Hazard actor with the printed numbers as values (`advancedCals: false`): level, XP, and the hit points, defences and
  * initiative the page prints; what it does not print is switched off with the sheet's own `none` flag (a trap without hit points
  * cannot be killed). The sheet has fields for how to notice it (`detection`) and how to deal with it (`countermeasures`); the rest
- * of the text, with the triggers and attacks, is the description. Its attacks are not powers: the DM reads them.
+ * of the text, with the triggers, is the description. Its attacks are `power` items on the actor (the hazard sheet has a powers
+ * tab), made by the same converter as the monsters' powers (trap-powers.mjs finds them in the text).
  *
  * Output: out/db/trap/_index.json and out/db/trap/<BOOK>.json.
  * Run after build-monsters.mjs (it does not touch out/db/trap).
@@ -16,8 +17,9 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { convertPowerItem } from "./build-monsters.mjs";
 
-export const TRAP_SCHEMA_VERSION = 2;
+export const TRAP_SCHEMA_VERSION = 3;
 
 const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 const slug = s => String(s).toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -39,6 +41,14 @@ export function buildTrap(t) {
 	const d = t.defences;
 	const defence = key => ({ base: d?.[key] ?? 10, none: d?.[key] === null || d?.[key] === undefined });
 	const hp = t.hp ?? 0;
+	const host = { id: t.id, level: t.level ?? 0, name: t.name, sourceCode: t.sourceCode, traits: [] };
+	const items = (t.powers ?? []).map((p, i) => {
+		const power = convertPowerItem(host, p, i);
+		Object.assign(power.flags.dnd4e.import, { kind: "trap-power", id: t.id, role: "power" });
+		return power;
+	});
+	const review = [...t.notes];
+	if (items.some(p => (p.flags.dnd4e.import.review ?? []).some(r => r.startsWith("attack-unparsed")))) review.push("power-attack-text");
 	return {
 		_id: stableId(t.id),
 		name: t.name,
@@ -58,8 +68,8 @@ export function buildTrap(t) {
 			source: { book: t.sourceCode ?? "", page: "", custom: "", revision: 1 },
 		},
 		prototypeToken: { name: t.name, width: 1, height: 1 },
-		items: [],
-		flags: { dnd4e: { import: { origin: "iws-4e-compendium", kind: "trap", id: t.id, sourceCode: t.sourceCode, schema: TRAP_SCHEMA_VERSION, review: [...t.notes], keywords: [cap(t.kind), ...(t.extraKind ? [t.extraKind] : [])] } } },
+		items,
+		flags: { dnd4e: { import: { origin: "iws-4e-compendium", kind: "trap", id: t.id, sourceCode: t.sourceCode, schema: TRAP_SCHEMA_VERSION, review, keywords: [cap(t.kind), ...(t.extraKind ? [t.extraKind] : [])] } } },
 	};
 }
 
@@ -68,7 +78,7 @@ export function indexRow(actor, t, file) {
 	return {
 		id: t.id, _id: actor._id, name: t.name, level: t.level, role: t.role, group: t.group, leader: false, size: "med", origin: "natural", creatureType: "animate",
 		keywords: actor.flags.dnd4e.import.keywords, xp: t.xp, hp: t.hp,
-		source: t.sourceCode, sources: t.sources, file, quality: "complete", notes: actor.flags.dnd4e.import.review, powers: 0, traits: 0,
+		source: t.sourceCode, sources: t.sources, file, quality: "complete", notes: actor.flags.dnd4e.import.review, powers: actor.items.length, traits: 0,
 	};
 }
 

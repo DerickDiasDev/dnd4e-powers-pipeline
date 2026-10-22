@@ -403,11 +403,12 @@ await run("H extras", "a trap is a Hazard actor with its printed numbers, how to
 	const a = make(await load("False-Floor Pit (Elite)"));
 	eq("H extras", "false-floor pit (elite): a Hazard actor, level 1, 200 XP", [a.type, a.system.details.level, a.system.details.exp], ["Hazard", 1, 200]);
 	eq("H extras", "its roles: a trap, elite, a warder", a.system.details.role.toObject?.() ?? a.system.details.role, { primary: "trap", secondary: "elite", tertiary: "warder" });
-	eq("H extras", "no printed hit points: switched off, and no powers", [a.system.attributes.hp.none, a.items.size], [true, 0]);
+	eq("H extras", "no printed hit points: switched off; its attack is a power on the sheet, +4 vs. Reflex", [a.system.attributes.hp.none, a.items.size, a.items.contents[0].type, a.items.contents[0].system.attack.formula, a.items.contents[0].system.attack.def], [true, 1, "power", "4", "ref"]);
 	record("H extras", "detection, countermeasures and the description have their texts", /DC 22/.test(a.system.details.detection) && /Thievery DC 27/.test(a.system.details.countermeasures) && /Trigger/.test(a.system.description), [a.system.details.detection.slice(0, 40), a.system.details.countermeasures.slice(0, 40)], "DC 22, Thievery DC 27 and a Trigger");
 	const h = make(await load("Crystalshock Stalagmite"));
 	eq("H extras", "crystalshock stalagmite: 90 hit points, AC 24, Fortitude 21, Reflex 5", [h.system.attributes.hp.max, h.system.defences.ac.base, h.system.defences.fort.base, h.system.defences.ref.base], [90, 24, 21, 5]);
 	eq("H extras", "its Will defence, printed as a dash, is switched off", h.system.defences.wil.none, true);
+	eq("H extras", "its attack is a power: close burst 2, +13 vs. Reflex, 2d8 + 4", [h.items.contents[0].system.rangeType, h.items.contents[0].system.area, h.items.contents[0].system.attack.formula, h.items.contents[0].system.hit.formula], ["closeBurst", "2", "13", "2d8 + 4"]);
 });
 
 await run("H extras", "a glossary entry is a journal entry with one text page", async () => {

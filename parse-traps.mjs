@@ -3,8 +3,8 @@
  *
  * Three page layouts exist (a "trap" stat block with titled blocks, a "th" block with triggered actions, and a plain page for
  * terrain); they give the same data here: the numbers a trap can have (level, XP, hit points, defences, initiative) when the page
- * prints them, and the whole text as lines, which is where the triggers, attacks and countermeasures are. The attacks are not
- * turned into powers: a trap's text is read by the DM.
+ * prints them, and the text as lines, which is where the triggers and the description are. The attacks are taken out of the text
+ * as powers (trap-powers.mjs); the detection and the countermeasures have their own fields.
  *
  * Usage: node parse-traps.mjs [--in out/trap.json] [--out out/parsed]
  */
@@ -12,6 +12,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { txt } from "./parse-powers.mjs";
+import { extractPowers } from "./trap-powers.mjs";
 
 /** The page's text as lines, the titled blocks of the trap layout each on their own line. */
 export function trapLines(html) {
@@ -90,6 +91,9 @@ export function parseTrap(entry) {
 	// The numbers the actor has fields for are not repeated in the text.
 	const sections = splitSections(withoutHeader(lines, name));
 	sections.body = sections.body.filter(l => !(/^Initiative [+-]?\d+$/.test(l) || /^HP \d+$/.test(l) || /^AC \d+, Fortitude \d+, Reflex \d+, Will (?:\d+|—|-)$/.test(l)));
+	const { powers, body } = extractPowers(sections.body, name);
+	sections.body = body;
+	sections.powers = powers;
 	return {
 		id: entry.id, name, kind, extraKind, ...header,
 		xp: xp ? Number(xp[1]) : null,

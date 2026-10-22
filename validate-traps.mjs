@@ -6,6 +6,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { ENUMS } from "./system-enums.mjs";
 
 const GROUPS = ["standard", "elite", "solo", "minion"];
 const PRIMARY = ["trap", "hazard", "other"];
@@ -38,8 +39,15 @@ export function validateTraps(actors, index) {
 		if (!TERTIARY.includes(s.details.role.tertiary)) fail(n, `role "${s.details.role.tertiary}" is not one of ${TERTIARY.join("/")}`);
 		if (typeof s.details.detection !== "string" || typeof s.details.countermeasures !== "string") fail(n, "detection and countermeasures are text");
 		for (const k of ["ac", "fort", "ref", "wil"]) if (!Number.isInteger(s.defences[k].base)) fail(n, `defence ${k} is not a number`);
-		if (!s.description && !s.details.detection && !s.details.countermeasures) fail(n, "empty text");
-		if (a.items.length) fail(n, "a trap has no powers as items");
+		if (!s.description && !s.details.detection && !s.details.countermeasures && !a.items.length) fail(n, "empty text");
+		for (const p of a.items) {
+			if (p.type !== "power") fail(n, `an item of a trap has type "${p.type}"`);
+			if (!/^[A-Za-z0-9]{16}$/.test(p._id) || seen.has(p._id)) fail(n, "a power's _id is not a unique 16-char id");
+			seen.add(p._id);
+			if (!ENUMS.useType.includes(p.system.useType)) fail(n, `power useType "${p.system.useType}"`);
+			if (!ENUMS.actionType.includes(p.system.actionType)) fail(n, `power actionType "${p.system.actionType}"`);
+			if (p.system.attack.isAttack && !(/^-?\d+$/.test(p.system.attack.formula) && ["ac", "fort", "ref", "wil"].includes(p.system.attack.def))) fail(n, "an attack needs a number and a defence");
+		}
 		if (a.flags.dnd4e.import.kind !== "trap") fail(n, "import kind is not trap");
 		const row = rows.get(a._id);
 		if (!row) fail(n, "actor is not in the index");
