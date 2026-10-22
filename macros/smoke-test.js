@@ -21,6 +21,7 @@
  *   H. extras     a deity writes its name into the sheet; diseases and companions, poisons, traps (NPCs with printed numbers) and glossary entries
  *                 (journal entries) are accepted by the model
  *   I. item powers the powers of a magic item are power items with the numbers of the level it is imported at (the equip/copy flow needs a world: see the README)
+ *   J. armour base a magic armour that names several kinds takes the bonus, penalties and kind of the armour or shield it is based on
  */
 const MODULE_ID = "dnd4e-importer";
 const base = (game.settings.get(MODULE_ID, "dbPath") || "dnd4e-db").replace(/^\/+|\/+$/g, "");
@@ -442,6 +443,35 @@ await run("I item powers", "two levels of an item have their own powers; an item
 	eq("I item powers", "each level has a power id of its own", four.powers[0]._id !== twelve.powers[0]._id, true);
 	const again = magicModule.planMagicImport(entry, row, planModule.existingKeys(twelve.create), { level: 12 });
 	eq("I item powers", "the same level again: nothing to create, no power", [again.create.length, again.powers.length], [0, 0]);
+});
+
+/* ======================================================= J. magic armour based on a mundane one */
+/** The item an import would create for a magic armour at `level`, based on a mundane armour or shield, optionally equipped. */
+const armourItem = async (name, baseName, { level = null, equip = false } = {}) => {
+	const row = magicRow(name);
+	const base = (await gearEntry(baseName)).items[0];
+	const { create } = magicModule.planMagicImport(await magicEntry(row), row, new Set(), { level, baseArmour: base });
+	return equip ? gearModule.equipItems(create) : create;
+};
+
+await run("J armour base", "a magic armour that names several kinds takes the numbers of the armour it is based on", async () => {
+	const plain = make(pc());
+	const items = await armourItem("Dwarven Armor", "Plate Armor", { level: 12, equip: true });
+	const worn = make(pc(), { items });
+	eq("J armour base", "dwarven armour at 12 based on plate: a heavy armour, plate, +3 enhancement, bonus 8", [items[0].system.armour.subtype, items[0].system.armourBaseType, items[0].system.armour.enhance, items[0].system.armour.ac], ["heavy", "plate", 3, 8]);
+	eq("J armour base", "worn: +8 plate and +3 enhancement = +11 AC", worn.system.defences.ac.value - plain.system.defences.ac.value, 11);
+	eq("J armour base", "worn: speed -1 and Stealth -2, the plate's penalties", [worn.system.movement.walk.value - plain.system.movement.walk.value, worn.system.skills.stl.total - plain.system.skills.stl.total], [-1, -2]);
+	eq("J armour base", "it remembers what it is based on", items[0].flags.dnd4e.import.baseArmour, "Plate Armor");
+});
+
+await run("J armour base", "an armour that does not fit is not used; a shield item takes a shield", async () => {
+	const unfit = await armourItem("Dwarven Armor", "Heavy Shield");
+	eq("J armour base", "a shield does not fit 'Chain, scale or plate': no base applied", [unfit[0].flags.dnd4e.import.baseArmour ?? null, unfit[0].system.armour.ac], [null, 0]);
+	const plain = make(pc({ details: { armourProf: { value: ["heavy"] } } }));
+	const items = await armourItem("Fighting Shield", "Heavy Shield", { equip: true });
+	const worn = make(pc({ details: { armourProf: { value: ["heavy"] } } }), { items });
+	eq("J armour base", "fighting shield based on a heavy shield: +2 AC and +2 Reflex for who is proficient", ["ac", "ref"].map(k => worn.system.defences[k].value - plain.system.defences[k].value), [2, 2]);
+	eq("J armour base", "it is an arms item of the heavy shield kind", [items[0].system.armour.type, items[0].system.armour.subtype, items[0].system.shieldBaseType], ["arms", "heavy", "heavy"]);
 });
 
 /* ======================================================= report */
