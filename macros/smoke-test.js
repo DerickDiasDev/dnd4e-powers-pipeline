@@ -20,6 +20,7 @@
  *   G. rituals    a ritual is accepted by the model with its category, times and the skill it rolls
  *   H. extras     a deity writes its name into the sheet; diseases and companions, poisons, traps (NPCs with printed numbers) and glossary entries
  *                 (journal entries) are accepted by the model
+ *   I. item powers the powers of a magic item are power items with the numbers of the level it is imported at (the equip/copy flow needs a world: see the README)
  */
 const MODULE_ID = "dnd4e-importer";
 const base = (game.settings.get(MODULE_ID, "dbPath") || "dnd4e-db").replace(/^\/+|\/+$/g, "");
@@ -413,6 +414,34 @@ await run("H extras", "a glossary entry is a journal entry with one text page", 
 	const entry = (await get("glossary/entries.json")).find(e => e._id === row._id);
 	const journal = new JournalEntry.implementation(clone(entry.journal));
 	eq("H extras", "athletics: one text page with the rules", [journal.pages.size, journal.pages.contents[0].type, journal.pages.contents[0].text.content.length > 3000], [1, "text", true]);
+});
+
+/* ======================================================= I. the powers of magic items */
+await run("I item powers", "an item's powers are power items with the numbers of the level it is imported at", async () => {
+	const thrower = magicRow("Dwarven Thrower");
+	const throwerEntry = await magicEntry(thrower);
+	const plan = magicModule.planMagicImport(throwerEntry, thrower, new Set(), { level: 12 });
+	const [power] = plan.powers;
+	eq("I item powers", "dwarven thrower at 12: one daily free-action power named like the item", [plan.powers.length, power.type, power.name, power.system.useType, power.system.actionType], [1, "power", "Dwarven Thrower +3", "daily", "free"]);
+	record("I item powers", "its effect says what it is at level 12 (6 extra damage)", /6 extra damage/.test(power.system.effect.detail) && /You hit a Large/.test(power.system.trigger), [power.system.trigger, power.system.effect.detail], "the trigger and the 6 extra damage of level 12");
+
+	const shock = magicRow("Shock Weapon");
+	const shockPlan = magicModule.planMagicImport(await magicEntry(shock), shock, new Set(), { level: 13 });
+	const [attack] = shockPlan.powers;
+	eq("I item powers", "shock weapon at 13: an attack of the item's level + 3 (16) against Reflex, 2d8 damage, critical 16", [attack.system.attack.isAttack, attack.system.attack.def, attack.system.attack.formula, attack.system.hit.formula, attack.system.hit.critFormula], [true, "ref", "16", "2d8", "16"]);
+
+	const a = make(pc(), { items: [...plan.create, ...plan.powers, ...shockPlan.powers] });
+	eq("I item powers", "the model accepts the item, with its link, and the powers", [a.items.filter(i => i.type === "power").length, a.items.filter(i => i.type === "weapon").length], [2, 1]);
+});
+
+await run("I item powers", "two levels of an item have their own powers; an item already there needs none", async () => {
+	const row = magicRow("Dwarven Thrower");
+	const entry = await magicEntry(row);
+	const four = magicModule.planMagicImport(entry, row, new Set(), { level: row.tiers[0].level });
+	const twelve = magicModule.planMagicImport(entry, row, new Set(), { level: 12 });
+	eq("I item powers", "each level has a power id of its own", four.powers[0]._id !== twelve.powers[0]._id, true);
+	const again = magicModule.planMagicImport(entry, row, planModule.existingKeys(twelve.create), { level: 12 });
+	eq("I item powers", "the same level again: nothing to create, no power", [again.create.length, again.powers.length], [0, 0]);
 });
 
 /* ======================================================= report */
