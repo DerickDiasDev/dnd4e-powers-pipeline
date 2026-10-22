@@ -1,5 +1,5 @@
 /**
- * Trap tests: HTML (three layouts) -> parsed trap -> NPC actor. The fixtures are invented (no book text).
+ * Trap tests: HTML (three layouts) -> parsed trap -> Hazard actor. The fixtures are invented (no book text).
  * The last block checks the real database when out/ exists.
  * Run: npm test
  */
@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseHeader, parseTrap, trapLines, withoutHeader } from "../parse-traps.mjs";
+import { parseHeader, parseTrap, splitSections, trapLines, withoutHeader } from "../parse-traps.mjs";
 import { buildTrap, describeHtml, indexRow } from "../build-traps.mjs";
 import { validateTraps } from "../validate-traps.mjs";
 
@@ -68,18 +68,36 @@ describe("parsing", () => {
 });
 
 describe("building", () => {
-	test("an NPC with the printed numbers; at least 1 hit point; the text is the biography", () => {
+	test("a Hazard actor with the printed numbers; what is not printed is switched off", () => {
 		const a = buildTrap(parseTrap(hazardLayout()));
-		assert.deepEqual([a.type, a.system.advancedCals, a.system.details.level, a.system.details.exp, a.system.attributes.hp.max, a.system.attributes.init.base], ["NPC", false, 10, 500, 90, 10]);
-		assert.deepEqual([a.system.defences.ac.base, a.system.defences.wil.base], [24, 10], "an unprinted defence is 10");
-		assert.equal(a.system.details.role.primary, "blaster");
+		assert.deepEqual([a.type, a.system.advancedCals, a.system.details.level, a.system.details.exp, a.system.attributes.hp.max, a.system.attributes.init.base], ["Hazard", false, 10, 500, 90, 10]);
+		assert.deepEqual([a.system.attributes.hp.none, a.system.attributes.init.none], [false, false]);
+		assert.deepEqual([a.system.defences.ac.base, a.system.defences.ac.none, a.system.defences.wil.none], [24, false, true], "a defence the page marks with a dash is switched off");
+		assert.deepEqual(a.system.details.role, { primary: "hazard", secondary: "standard", tertiary: "blaster" });
 		assert.deepEqual(a.flags.dnd4e.import.keywords, ["Hazard"]);
 		const bare = buildTrap(parseTrap(terrainLayout()));
-		assert.deepEqual([bare.system.attributes.hp.max, bare.system.details.level], [1, 0]);
+		assert.deepEqual([bare.system.attributes.hp.none, bare.system.attributes.hp.max, bare.system.details.level], [true, 0, 0]);
+		assert.deepEqual([bare.system.defences.ac.none, bare.system.attributes.init.none], [true, true]);
+		assert.deepEqual(bare.system.details.role, { primary: "other", secondary: "standard", tertiary: "other" });
 		assert.deepEqual(bare.flags.dnd4e.import.keywords, ["Terrain", "Fantastic Terrain"]);
 	});
 
-	test("the biography escapes the text and bolds the titles of the blocks", () => {
+	test("how to notice it and how to deal with it have their own fields, and are not in the description", () => {
+		const t = parseTrap(trapLayout({ extra: '<span class=trapblocktitle>Perception</span><span class=trapblockbody>✦ DC 22: Notice the stonework.</span><span class=trapblocktitle>Countermeasures</span><span class=trapblockbody>✦ Thievery DC 12: Trigger it.</span><span class=trapblockbody>✦ Thievery DC 27: Disable it.</span>' }));
+		assert.deepEqual([t.detection, t.countermeasures], ["DC 22: Notice the stonework.", "Thievery DC 12: Trigger it.\nThievery DC 27: Disable it."]);
+		assert.ok(!t.body.some(l => /Notice the stonework|Disable it|^Perception$|^Countermeasures$/.test(l)));
+		const a = buildTrap(t);
+		assert.deepEqual([a.system.details.detection, a.system.details.countermeasures.split("\n").length], ["DC 22: Notice the stonework.", 2]);
+	});
+
+	test("the numbers the actor has fields for are not repeated in the text; a Detect line is the detection", () => {
+		const { body, detection } = splitSections(["Detect automatic", "Standard Actions", "Hit: 1d8."]);
+		assert.deepEqual([detection, body], ["Detect automatic", ["Standard Actions", "Hit: 1d8."]]);
+		const t = parseTrap(hazardLayout());
+		assert.ok(!t.body.some(l => /^(?:HP|AC|Initiative) /.test(l)));
+	});
+
+	test("the description escapes the text and bolds the titles of the blocks", () => {
 		const html = describeHtml({ body: ["Trigger", "A <b> creature enters.", "Attack: +4 vs. Reflex"] });
 		assert.equal(html, "<p><strong>Trigger</strong></p><p>A &lt;b&gt; creature enters.</p><p>Attack: +4 vs. Reflex</p>");
 	});
@@ -91,8 +109,11 @@ describe("building", () => {
 		const row = indexRow(a, t, "tst.json");
 		assert.deepEqual([row.level, row.role, row.group, row.file, row.powers, row.traits], [3, "warder", "elite", "tst.json", 0, 0]);
 		assert.equal(validateTraps([a], [row]).size, 0);
-		a.system.attributes.hp.max = 0;
-		assert.match([...validateTraps([a], [row]).keys()].join(), /hit points/);
+		a.system.attributes.hp.max = 5;
+		assert.match([...validateTraps([a], [row]).keys()].join(), /hit points/, "no hit points (none) but a maximum");
+		a.system.attributes.hp.none = false;
+		a.system.attributes.hp.value = 5;
+		assert.equal(validateTraps([a], [row]).size, 0, "hit points that are on, at least 1 and full, are fine");
 	});
 });
 
@@ -108,6 +129,6 @@ describe("the real database", () => {
 		assert.equal(index.length, actors.length);
 		assert.ok(actors.length >= 770);
 		const pit = actors.find(a => a.name === "False-Floor Pit (Elite)");
-		assert.deepEqual([pit.system.details.level, pit.system.details.exp, pit.system.details.role.secondary, pit.system.details.role.primary], [1, 200, "elite", "warder"]);
+		assert.deepEqual([pit.type, pit.system.details.level, pit.system.details.exp, pit.system.details.role], ["Hazard", 1, 200, { primary: "trap", secondary: "elite", tertiary: "warder" }]);
 	});
 });

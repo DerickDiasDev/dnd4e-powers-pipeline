@@ -1,5 +1,5 @@
 /**
- * Static validation of out/db/trap: the NPC actors a trap becomes, and that the index agrees with the files.
+ * Static validation of out/db/trap: the Hazard actors a trap becomes, and that the index agrees with the files.
  *
  * Usage: node validate-traps.mjs [--db out/db]
  */
@@ -8,6 +8,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const GROUPS = ["standard", "elite", "solo", "minion"];
+const PRIMARY = ["trap", "hazard", "other"];
+const TERTIARY = ["blaster", "lurker", "obstacle", "warder", "other"];
 
 /** @returns {Map<string, {count: number, examples: string[]}>} problems found, keyed by message */
 export function validateTraps(actors, index) {
@@ -25,14 +27,18 @@ export function validateTraps(actors, index) {
 		if (seen.has(a._id)) fail(n, "duplicate _id");
 		seen.add(a._id);
 		if (!/^[A-Za-z0-9]{16}$/.test(a._id)) fail(n, "_id is not a 16-char id");
-		if (a.type !== "NPC") fail(n, `actor type "${a.type}" is not NPC`);
+		if (a.type !== "Hazard") fail(n, `actor type "${a.type}" is not Hazard`);
 		const s = a.system;
 		if (s.advancedCals !== false) fail(n, "a trap uses the printed numbers (advancedCals false)");
-		if (!(s.attributes.hp.max >= 1 && s.attributes.hp.value === s.attributes.hp.max)) fail(n, "hit points must be at least 1 and full");
+		const hp = s.attributes.hp;
+		if (hp.none ? hp.max !== 0 : !(hp.max >= 1 && hp.value === hp.max)) fail(n, "hit points: none and 0, or at least 1 and full");
 		if (!(Number.isInteger(s.details.level) && s.details.level >= 0 && s.details.level <= 40)) fail(n, `level ${s.details.level} is not plausible`);
 		if (!GROUPS.includes(s.details.role.secondary)) fail(n, `group "${s.details.role.secondary}" is not one of ${GROUPS.join("/")}`);
+		if (!PRIMARY.includes(s.details.role.primary)) fail(n, `primary role "${s.details.role.primary}" is not one of ${PRIMARY.join("/")}`);
+		if (!TERTIARY.includes(s.details.role.tertiary)) fail(n, `role "${s.details.role.tertiary}" is not one of ${TERTIARY.join("/")}`);
+		if (typeof s.details.detection !== "string" || typeof s.details.countermeasures !== "string") fail(n, "detection and countermeasures are text");
 		for (const k of ["ac", "fort", "ref", "wil"]) if (!Number.isInteger(s.defences[k].base)) fail(n, `defence ${k} is not a number`);
-		if (!s.biography) fail(n, "empty text");
+		if (!s.description && !s.details.detection && !s.details.countermeasures) fail(n, "empty text");
 		if (a.items.length) fail(n, "a trap has no powers as items");
 		if (a.flags.dnd4e.import.kind !== "trap") fail(n, "import kind is not trap");
 		const row = rows.get(a._id);

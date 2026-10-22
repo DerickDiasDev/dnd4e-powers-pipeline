@@ -387,21 +387,24 @@ await run("H extras", "poisons are consumables of type poison, in both page layo
 	}
 	const a = make(pc(), { items });
 	eq("H extras", "bloodroot (newer page) and carrion crawler brain juice (DMG, older page): consumables of type poison", a.items.map(i => [i.type, i.system.consumableType]), [["consumable", "poison"], ["consumable", "poison"]]);
-	eq("H extras", "the DMG poison costs 250 gp and is level 5", [a.items[1].system.price, a.items[1].system.level], [250, 5]);
+	eq("H extras", "the DMG poison costs 250 gp and is level 5", [a.items.contents[1].system.price, a.items.contents[1].system.level], [250, 5]);
 });
 
-await run("H extras", "a trap is an NPC with its printed numbers and its text", async () => {
+await run("H extras", "a trap is a Hazard actor with its printed numbers, how to notice it and how to deal with it", async () => {
 	const index = await get("trap/_index.json");
-	const row = index.find(r => r.name === "False-Floor Pit (Elite)");
-	if (!row) throw new Error("trap \"False-Floor Pit (Elite)\" is not in the database");
-	const trap = (await get(`trap/${row.file}`)).find(a => a._id === row._id);
-	const a = make(trap);
-	eq("H extras", "false-floor pit (elite): level 1, 200 XP, elite warder", [a.system.details.level, a.system.details.exp, a.system.details.role.secondary, a.system.details.role.primary], [1, 200, "elite", "warder"]);
-	eq("H extras", "no printed hit points: 1, and no powers", [a.system.attributes.hp.max, a.items.size], [1, 0]);
-	record("H extras", "the biography has the trigger and the countermeasures", /Trigger/.test(a.system.biography) && /Countermeasures/.test(a.system.biography), a.system.biography.slice(0, 120), "Trigger and Countermeasures");
-	const stalagmite = (await get(`trap/${index.find(r => r.name === "Crystalshock Stalagmite").file}`)).find(x => x.name === "Crystalshock Stalagmite");
-	const h = make(stalagmite);
-	eq("H extras", "crystalshock stalagmite: 90 hit points, AC 24, Fortitude 21, Reflex 5", [h.system.attributes.hp.max, h.system.defences.ac.value, h.system.defences.fort.value, h.system.defences.ref.value], [90, 24, 21, 5]);
+	const load = async name => {
+		const row = index.find(r => r.name === name);
+		if (!row) throw new Error(`trap "${name}" is not in the database`);
+		return (await get(`trap/${row.file}`)).find(a => a._id === row._id);
+	};
+	const a = make(await load("False-Floor Pit (Elite)"));
+	eq("H extras", "false-floor pit (elite): a Hazard actor, level 1, 200 XP", [a.type, a.system.details.level, a.system.details.exp], ["Hazard", 1, 200]);
+	eq("H extras", "its roles: a trap, elite, a warder", a.system.details.role.toObject?.() ?? a.system.details.role, { primary: "trap", secondary: "elite", tertiary: "warder" });
+	eq("H extras", "no printed hit points: switched off, and no powers", [a.system.attributes.hp.none, a.items.size], [true, 0]);
+	record("H extras", "detection, countermeasures and the description have their texts", /DC 22/.test(a.system.details.detection) && /Thievery DC 27/.test(a.system.details.countermeasures) && /Trigger/.test(a.system.description), [a.system.details.detection.slice(0, 40), a.system.details.countermeasures.slice(0, 40)], "DC 22, Thievery DC 27 and a Trigger");
+	const h = make(await load("Crystalshock Stalagmite"));
+	eq("H extras", "crystalshock stalagmite: 90 hit points, AC 24, Fortitude 21, Reflex 5", [h.system.attributes.hp.max, h.system.defences.ac.base, h.system.defences.fort.base, h.system.defences.ref.base], [90, 24, 21, 5]);
+	eq("H extras", "its Will defence, printed as a dash, is switched off", h.system.defences.wil.none, true);
 });
 
 await run("H extras", "a glossary entry is a journal entry with one text page", async () => {

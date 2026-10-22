@@ -1,10 +1,11 @@
 /**
- * Builds the traps part of the database (out/db/trap/) from out/parsed/trap.json: traps, hazards, terrain and obstacles as NPC
- * actors, in the same shape (and the same index rows) as the monsters, so the importer lists them in the monster window.
+ * Builds the traps part of the database (out/db/trap/) from out/parsed/trap.json: traps, hazards, terrain and obstacles as the
+ * system's `Hazard` actors, with the same index rows as the monsters, so the importer lists them in the monster window.
  *
- * A trap is an NPC with the printed numbers as values (`advancedCals: false`): level, XP, hit points, defences and initiative when
- * the page prints them (a trap without hit points has 1: the actor needs at least that), and its whole text as the biography,
- * where the triggers, attacks and countermeasures are. Its attacks are not powers: the DM reads them.
+ * A trap is a Hazard actor with the printed numbers as values (`advancedCals: false`): level, XP, and the hit points, defences and
+ * initiative the page prints; what it does not print is switched off with the sheet's own `none` flag (a trap without hit points
+ * cannot be killed). The sheet has fields for how to notice it (`detection`) and how to deal with it (`countermeasures`); the rest
+ * of the text, with the triggers and attacks, is the description. Its attacks are not powers: the DM reads them.
  *
  * Output: out/db/trap/_index.json and out/db/trap/<BOOK>.json.
  * Run after build-monsters.mjs (it does not touch out/db/trap).
@@ -16,7 +17,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const TRAP_SCHEMA_VERSION = 1;
+export const TRAP_SCHEMA_VERSION = 2;
 
 const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 const slug = s => String(s).toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -29,23 +30,30 @@ export function describeHtml(t) {
 	return t.body.map(line => (title.test(line) && line.length < 40 ? `<p><strong>${esc(line)}</strong></p>` : `<p>${esc(line)}</p>`)).join("");
 }
 
+/** The sheet's own roles: primary trap/hazard/other, tertiary blaster/lurker/obstacle/warder/other. */
+const PRIMARY = { trap: "trap", hazard: "hazard" };
+const TERTIARY = new Set(["blaster", "lurker", "obstacle", "warder"]);
+
 /** @param {object} t a parsed trap */
 export function buildTrap(t) {
-	const hp = Math.max(1, t.hp ?? 1);
-	const d = t.defences ?? {};
-	const actor = {
+	const d = t.defences;
+	const defence = key => ({ base: d?.[key] ?? 10, none: d?.[key] === null || d?.[key] === undefined });
+	const hp = t.hp ?? 0;
+	return {
 		_id: stableId(t.id),
 		name: t.name,
-		type: "NPC",
+		type: "Hazard",
 		system: {
 			advancedCals: false,
+			description: describeHtml(t),
 			details: {
-				level: t.level ?? 0, exp: t.xp ?? 0, size: "med", origin: "natural", type: "animate", other: "",
-				role: { primary: t.role, secondary: t.group, leader: false }, alignment: "",
+				level: t.level ?? 0, exp: t.xp ?? 0, size: "med",
+				detection: t.detection ?? "", countermeasures: t.countermeasures ?? "",
+				role: { primary: PRIMARY[t.kind] ?? "other", secondary: t.group, tertiary: TERTIARY.has(t.role) ? t.role : (t.kind === "obstacle" ? "obstacle" : "other") },
+				bloodied: Math.floor(hp / 2),
 			},
-			attributes: { hp: { value: hp, max: hp }, init: { base: t.initiative ?? 0 } },
-			defences: { ac: { base: d.ac ?? 10 }, fort: { base: d.fort ?? 10 }, ref: { base: d.ref ?? 10 }, wil: { base: d.wil ?? 10 } },
-			biography: describeHtml(t),
+			attributes: { hp: { value: hp, max: hp, none: !t.hp }, init: { base: t.initiative ?? 0, none: t.initiative === null } },
+			defences: { ac: defence("ac"), fort: defence("fort"), ref: defence("ref"), wil: defence("wil") },
 			identifier: slug(t.name),
 			source: { book: t.sourceCode ?? "", page: "", custom: "", revision: 1 },
 		},
@@ -53,7 +61,6 @@ export function buildTrap(t) {
 		items: [],
 		flags: { dnd4e: { import: { origin: "iws-4e-compendium", kind: "trap", id: t.id, sourceCode: t.sourceCode, schema: TRAP_SCHEMA_VERSION, review: [...t.notes], keywords: [cap(t.kind), ...(t.extraKind ? [t.extraKind] : [])] } } },
 	};
-	return actor;
 }
 
 /** A light row for the importer's list: the monsters' shape. */

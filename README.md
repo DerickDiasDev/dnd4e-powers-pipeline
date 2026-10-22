@@ -17,7 +17,7 @@ A private pipeline that turns a snapshot of the D&D 4th Edition compendium into 
 | Deities, diseases, companions and familiars | 134 / 69 / 194 | `feature` items, listed with the character options |
 | Poisons | 38 | `consumable` items of type poison, with the magic items |
 | Rules glossary | 545 | journal entries (one text page each) |
-| Traps, hazards, terrain | 776 | NPC actors with the printed numbers and the text |
+| Traps, hazards, terrain | 776 | `Hazard` actors with the printed numbers, detection, countermeasures and the text |
 | Rituals | 360 | `ritual` items: category, level, time, duration, price, key skill and the result tables |
 | Mundane equipment | 481 | 492 `weapon`, `equipment`, `consumable` and `loot` items (weapons, armour incl. masterwork, shields, implements, ammunition, adventuring gear) |
 
@@ -135,11 +135,7 @@ They are written where the character options are (`out/db/option/<deity|disease|
 
 ## Traps, hazards and terrain
 
-NPC actors in the monsters' shape (`out/db/trap/`, the same index rows), so the importer lists them in a window like the monsters'. Three page layouts exist; they give the same data: level, XP, group (standard, elite, solo, minion) and role (warder, lurker, blaster...) when printed, hit points, defences and initiative for the ones that have them (an unprinted defence is 10; hit points are at least 1), and the whole text as the biography, where the triggers, attacks and countermeasures are. The keyword says what it is (Trap, Hazard, Terrain, Obstacle, and Fantastic Terrain or Terrain Power). The attacks are not turned into powers: the DM reads them. Notes: `level-missing` (159), `hp-none`.
-
-## Rules glossary
-
-The compendium's glossary pages (combat, conditions, skills, keywords, weapon groups and properties, monster origins and races, tables) become **journal entries** with one text page each, in `out/db/glossary/` (`entries.json` holds the journal data, `_index.json` the light rows with category and type). The page is the compendium's HTML without its title, attributes and links, and only the tags a page needs (paragraphs, line breaks, bold, italic, headings, tables, lists).
+The system has a `Hazard` actor, and that is what a trap becomes (`out/db/trap/`, with the same index rows as the monsters, so the importer lists them in a window like the monsters’). Three page layouts exist; they give the same data: level, XP, group (standard, elite, solo, minion) and role when printed; hit points, defences and initiative when printed, and what is not printed is switched off with the sheet’s own `none` flags (a trap without hit points cannot be killed, a Will printed as a dash is no defence). The sheet’s roles are filled: primary trap/hazard/other, secondary the group, tertiary blaster/lurker/obstacle/warder/other. How to notice it (the Perception block or the Detect line) is `details.detection`, how to deal with it (the Countermeasures block) is `details.countermeasures`, and the rest of the text, with the triggers and attacks, is the description. The attacks are not turned into powers: the DM reads them. The keyword says what it is (Trap, Hazard, Terrain, Obstacle, and Fantastic Terrain or Terrain Power). Notes: `level-missing` (159), `hp-none`.
 
 ## Rituals
 

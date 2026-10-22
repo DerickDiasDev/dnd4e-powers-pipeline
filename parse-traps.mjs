@@ -46,6 +46,28 @@ export function withoutHeader(lines, name) {
 	return out;
 }
 
+/** The titles of the blocks of a trap's text: a line that is only one of these starts a block that runs to the next title. */
+const TITLES = /^(?:Perception|Trigger|Attack|Countermeasures|Triggered Actions|Standard Actions|Immediate Reaction|Immediate Interrupt|Minor Actions|Move Actions|Effect|Special|Requirement|Target)$/i;
+
+/**
+ * Takes out of the text what the hazard sheet has fields for: how to notice it (the Perception block, or the "Detect" line) and
+ * how to deal with it (the Countermeasures block). What is left is the description.
+ * @returns {{detection: string, countermeasures: string, body: string[]}}
+ */
+export function splitSections(lines) {
+	const body = [], detection = [], countermeasures = [];
+	let into = body;
+	for (const line of lines) {
+		if (/^Perception$/i.test(line)) into = detection;
+		else if (/^Countermeasures$/i.test(line)) into = countermeasures;
+		else if (TITLES.test(line)) { into = body; body.push(line); }
+		else if (/^Detect\b/i.test(line) && into === body) detection.push(line);
+		else into.push(line);
+	}
+	const clean = list => list.map(l => l.replace(/^✦\s*/, "")).join("\n");
+	return { detection: clean(detection), countermeasures: clean(countermeasures), body };
+}
+
 export function parseTrap(entry) {
 	const listing = entry.listing;
 	const lines = trapLines(entry.html);
@@ -65,6 +87,9 @@ export function parseTrap(entry) {
 	const notes = [];
 	if (header.level === null) notes.push("level-missing");
 	if (!hp) notes.push("hp-none");
+	// The numbers the actor has fields for are not repeated in the text.
+	const sections = splitSections(withoutHeader(lines, name));
+	sections.body = sections.body.filter(l => !(/^Initiative [+-]?\d+$/.test(l) || /^HP \d+$/.test(l) || /^AC \d+, Fortitude \d+, Reflex \d+, Will (?:\d+|—|-)$/.test(l)));
 	return {
 		id: entry.id, name, kind, extraKind, ...header,
 		xp: xp ? Number(xp[1]) : null,
@@ -72,7 +97,7 @@ export function parseTrap(entry) {
 		initiative: init ? Number(init[1]) : null,
 		defences: def ? { ac: Number(def[1]), fort: Number(def[2]), ref: Number(def[3]), wil: /\d/.test(def[4]) ? Number(def[4]) : null } : null,
 		// The title is the actor's name: the first line, when it is that.
-		body: withoutHeader(lines, name),
+		...sections,
 		sources, sourceCode: sources[0] ?? null, notes,
 	};
 }
