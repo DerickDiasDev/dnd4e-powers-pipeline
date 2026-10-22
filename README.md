@@ -16,6 +16,7 @@ A private pipeline that turns a snapshot of the D&D 4th Edition compendium into 
 | Magic items | 3,245 | one item each, with its levels (tiers), enhancement bonus and price |
 | Deities, diseases, companions and familiars | 134 / 69 / 194 | `feature` items, listed with the character options |
 | Poisons | 38 | `consumable` items of type poison, with the magic items |
+| Traps, hazards, terrain | 776 | NPC actors with the printed numbers and the text |
 | Rituals | 360 | `ritual` items: category, level, time, duration, price, key skill and the result tables |
 | Mundane equipment | 481 | 492 `weapon`, `equipment`, `consumable` and `loot` items (weapons, armour incl. masterwork, shields, implements, ammunition, adventuring gear) |
 
@@ -130,6 +131,10 @@ Every `mihead` page of the weapon, armour, implement and item tables. The title 
 They are written where the character options are (`out/db/option/<deity|disease|companion>/`, the same shape), so the importer lists them in the options window. Each is one `feature` item (`featureType: other`, `featureGroup` says what it is) whose description is the page. A **deity** keeps its header facts (type, alignment, domains, sphere, priests...) and `apply.deity` lets the importer write its name into the sheet's deity field; its domains are searchable. A **disease** keeps its level (or none, for the variable-level ones), its stages and the check between them. A **companion** (animal and elemental companions, familiars, mounts, summoned creatures) keeps its stat block as text: their numbers depend on the master's level, so they cannot be a fixed actor.
 
 **Poisons** go through the magic item stage (both page layouts, the older one with the attack and the failed saves as lines): a `consumable` of type poison with its level and price.
+
+## Traps, hazards and terrain
+
+NPC actors in the monsters' shape (`out/db/trap/`, the same index rows), so the importer lists them in a window like the monsters'. Three page layouts exist; they give the same data: level, XP, group (standard, elite, solo, minion) and role (warder, lurker, blaster...) when printed, hit points, defences and initiative for the ones that have them (an unprinted defence is 10; hit points are at least 1), and the whole text as the biography, where the triggers, attacks and countermeasures are. The keyword says what it is (Trap, Hazard, Terrain, Obstacle, and Fantastic Terrain or Terrain Power). The attacks are not turned into powers: the DM reads them. Notes: `level-missing` (159), `hp-none`.
 
 ## Rituals
 
