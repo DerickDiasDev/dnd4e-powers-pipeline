@@ -14,8 +14,10 @@
  *
  * An item that exists at several levels is one entry with `tiers` ({level, enhancement, price}); the item data is built at the
  * first tier and the importer patches level, enhancement and price for the tier the player picks.
- * The powers of an item that can be equipped (not a consumable) are built as `power` items (item-powers.mjs) and kept in `powers`;
- * the importer creates them next to the item and links them, and the system copies them to the actor while the item is equipped.
+ * The powers of an item that can be equipped are built as `power` items (item-powers.mjs) and kept in `powers`; the importer creates
+ * them next to the item and links them, and the system copies them to the actor while the item is equipped. A consumable is used
+ * from the item itself, which has the fields of a power (attack, hit, miss, effect, range): its first power is merged into the
+ * item (`consumablePower`) and the lines that grow with the level stay in the item's import flags for the importer to apply.
  * Standing bonuses written in a Property section become effects that transfer, and are suppressed while the item is not
  * equipped. Powers stay in the description (their numbers change with the level).
  *
@@ -192,15 +194,39 @@ export function buildMagic(m, mundane = new Map()) {
 	}
 
 	const notes = [...m.notes, ...built.notes];
+	const own = item.type === "consumable" ? buildItemPowers(m) : [];
+	if (own.length) consumablePower(item, own[0]);
 	// The powers of an item that can be equipped are power items the system copies to the actor while it is worn; a consumable's stay in its text.
 	const powers = ["equipment", "weapon"].includes(item.type) ? buildItemPowers(m) : [];
 	if (powers.length) notes.push("powers-linked");
-	else if (powerHeadings(m).length) notes.push("powers-in-text");
-	if (powers.some(p => (p.flags.dnd4e.import.review ?? []).some(r => r.startsWith("attack-unparsed")))) notes.push("power-attack-text");
+	else if (powerHeadings(m).length && (!own.length || own.length > 1)) notes.push("powers-in-text");
+	if ([...powers, ...own.slice(0, 1)].some(p => (p.flags.dnd4e.import.review ?? []).some(r => r.startsWith("attack-unparsed")))) notes.push("power-attack-text");
 	return {
 		id: m.id, _id: item._id, name: m.name, category: m.category, type: m.type, rarity: m.rarity, source: m.sourceCode, sources: m.sources,
 		tiers: m.tiers, scales: m.scales, base, notes, items: [item], powers,
 	};
+}
+
+/** The fields of a power item that a consumable has too; the rest of a power (its usage, its trigger) has no field on a consumable. */
+const POWER_FIELDS = ["actionType", "rangeType", "rangePower", "area", "target", "autoTarget", "keywordsCustom", "effectType", "damageType", "attack", "hit", "miss", "effect", "damage", "damageCrit", "damageMiss", "damageCritImp"];
+
+/**
+ * Merges the first power of a consumable into the consumable: it is used from the item (a chat card like a power's, one use, the item
+ * is destroyed with it). A trigger, requirement or special line has no field on a consumable, so it goes in front of the effect text.
+ */
+export function consumablePower(item, power) {
+	const p = power.system;
+	for (const key of POWER_FIELDS) if (p[key] !== undefined) item.system[key] = structuredClone(p[key]);
+	const lead = ["trigger", "requirement", "special"].filter(k => p[k]).map(k => `${k[0].toUpperCase()}${k.slice(1)}: ${p[k]}`);
+	if (lead.length) item.system.effect = { ...item.system.effect, detail: [...lead, item.system.effect?.detail].filter(Boolean).join("\n") };
+	Object.assign(item.system, { useType: "item", autoGenChatPowerCard: true });
+	item.system.uses = { ...item.system.uses, autoDestroy: true };
+	item.effects = structuredClone(power.effects ?? []);
+	const flags = power.flags.dnd4e.import;
+	const own = item.flags.dnd4e.import;
+	for (const k of ["scaling", "attackLevelOffset", "review"]) if (flags[k] !== undefined && (k !== "review" || flags[k].length)) own[k] = structuredClone(flags[k]);
+	own.itemPower = true;
+	return item;
 }
 
 /** A light row for the importer's list. */

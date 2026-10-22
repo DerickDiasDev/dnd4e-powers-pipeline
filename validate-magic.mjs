@@ -52,8 +52,8 @@ export function validateMagic(entries, index) {
 		} else if (item.type === "consumable") inList(n, "consumableType", s.consumableType, ENUMS.consumableTypes);
 		else if (item.type !== "loot") fail(n, `unexpected item type "${item.type}"`);
 		for (const p of effectProblems(item, effectIds)) fail(n, `effect: ${p}`);
-		if (item.effects.length && !["equipment", "weapon"].includes(item.type)) fail(n, "effects only on items that can be equipped");
-		if (item.effects.some(f => f.system.equippedRec !== true)) fail(n, "an item's effect must be suppressed while the item is not equipped");
+		if (item.effects.length && !["equipment", "weapon", "consumable"].includes(item.type)) fail(n, "effects only on items that can be equipped or used");
+		if (item.type !== "consumable" && item.effects.some(f => f.system.equippedRec !== true)) fail(n, "an item's effect must be suppressed while the item is not equipped");
 		const row = rows.get(e._id);
 		if (!row) fail(n, "entry is not in the index");
 		else if (JSON.stringify(row.items) !== JSON.stringify([item._id])) fail(n, "index items differ from the entry's items");

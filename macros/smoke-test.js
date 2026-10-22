@@ -21,6 +21,7 @@
  *   H. extras     a deity writes its name into the sheet; diseases and companions, poisons, traps (NPCs with printed numbers) and glossary entries
  *                 (journal entries) are accepted by the model
  *   I. item powers the powers of a magic item are power items with the numbers of the level it is imported at (the equip/copy flow needs a world: see the README)
+ *   K. consumables a consumable is its own power: it takes the attack and damage of the level it is imported at
  *   J. armour base a magic armour that names several kinds takes the bonus, penalties and kind of the armour or shield it is based on
  */
 const MODULE_ID = "dnd4e-importer";
@@ -472,6 +473,20 @@ await run("J armour base", "an armour that does not fit is not used; a shield it
 	const worn = make(pc({ details: { armourProf: { value: ["heavy"] } } }), { items });
 	eq("J armour base", "fighting shield based on a heavy shield: +2 AC and +2 Reflex for who is proficient", ["ac", "ref"].map(k => worn.system.defences[k].value - plain.system.defences[k].value), [2, 2]);
 	eq("J armour base", "it is an arms item of the heavy shield kind", [items[0].system.armour.type, items[0].system.armour.subtype, items[0].system.shieldBaseType], ["arms", "heavy", "heavy"]);
+});
+
+/* ======================================================= K. the powers of consumables */
+await run("K consumables", "a consumable is its own power: the attack and damage of the level it is imported at, one use", async () => {
+	const row = magicRow("Alchemist's Acid");
+	const entry = await magicEntry(row);
+	const at = level => magicModule.planMagicImport(entry, row, new Set(), { level });
+	const first = at(null).create[0];
+	eq("K consumables", "alchemist's acid as it is first: +4 vs. Reflex, 1d10 acid, a power card, used up with the use", [first.system.attack.formula, first.system.attack.def, first.system.hit.formula, first.system.autoGenChatPowerCard, first.system.uses.autoDestroy], ["4", "ref", "1d10", true, true]);
+	const high = at(11).create[0];
+	eq("K consumables", "at 11: +14 vs. Reflex and 2d10", [high.system.attack.formula, high.system.hit.formula, high.system.level], ["14", "2d10", 11]);
+	eq("K consumables", "it has no power items to create; ranged 5/10, standard action", [at(11).powers.length, high.system.actionType, high.system.rangeType], [0, "standard", "range"]);
+	const a = make(pc(), { items: [first, high] });
+	eq("K consumables", "the model accepts both", a.items.filter(i => i.type === "consumable").length, 2);
 });
 
 /* ======================================================= report */

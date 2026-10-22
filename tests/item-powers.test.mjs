@@ -90,12 +90,31 @@ describe("in the entry", () => {
 	const consumable = `<h1 class=mihead>Zorb Oil<span class=milevel>Level 3 Uncommon</span></h1><p class=miflavor>f</p><p class=mistat><b>Consumable: </b>Oil        30 gp</p><h2 class=mihead>Power ✦ Consumable (Standard Action)</h2><p class='mistat indent'>Apply it.</p>`;
 	const entry = html => buildMagic(parseMagic({ id: "weapon901", listing: { Name: "Zorb Blade", Type: "Longsword", Rarity: "Uncommon", SourceBook: "TST", Cost: "" }, html }));
 
-	test("an item that can be equipped has its powers in the entry and a note; a consumable keeps them in the text", () => {
+	test("an item that can be equipped has its powers in the entry and a note; a consumable is its own power", () => {
 		const e = entry(page);
 		assert.deepEqual([e.powers.length, e.notes.includes("powers-linked"), e.notes.includes("powers-in-text")], [1, true, false]);
 		assert.equal(e.powers[0].flags.dnd4e.import.scaling[0].levels[0], 9);
 		const c = buildMagic(parseMagic({ id: "item901", listing: { Name: "Zorb Oil", Category: "Consumable", Type: "Alchemical Item", Rarity: "Uncommon", SourceBook: "TST", Cost: "30 gp" }, html: consumable }));
-		assert.deepEqual([c.powers.length, c.notes.includes("powers-in-text")], [0, true]);
+		assert.deepEqual([c.powers.length, c.notes.includes("powers-in-text")], [0, false]);
+		assert.deepEqual([c.items[0].system.useType, c.items[0].system.actionType, c.items[0].system.autoGenChatPowerCard, c.items[0].system.uses.autoDestroy], ["item", "standard", true, true]);
+		assert.match(c.items[0].system.effect.detail, /Apply it/);
+	});
+
+	test("a consumable with an attack takes its range, bonus and damage, and keeps the lines that grow with its level", () => {
+		const oil = `<h1 class=mihead>Zorb Flask<span class=milevel>Level 1 Common</span></h1><p class=miflavor>f</p><p class=mistat><b>Consumable: </b>Alchemical Item        20 gp</p><h2 class=mihead>Power (Acid) ✦ Consumable (Standard Action)</h2><p class='mistat indent'>Make an attack: Ranged 5/10; +4 vs. Reflex; on a hit, 1d10 acid damage.</p><p class='mistat indent1'>Level 6: +9 vs. Reflex; 2d10 acid damage.</p>`;
+		const c = buildMagic(parseMagic({ id: "item902", listing: { Name: "Zorb Flask", Category: "Consumable", Type: "Alchemical Item", Rarity: "Common", SourceBook: "TST", Cost: "20 gp" }, html: oil }));
+		const it = c.items[0], s = it.system;
+		assert.deepEqual([s.attack.isAttack, s.attack.def, s.attack.formula, s.rangeType, s.rangePower, s.hit.formula, s.damageType.acid], [true, "ref", "4", "range", "5", "1d10", true]);
+		assert.equal(it.flags.dnd4e.import.itemPower, true);
+		assert.deepEqual(it.flags.dnd4e.import.scaling.map(x => x.levels), [[6]]);
+		assert.equal(validateMagic([c], [{ _id: c._id, items: [c._id], powerItems: 0 }]).size, 0);
+	});
+
+	test("a consumable with two powers takes the first and keeps the note", () => {
+		const two = consumable.replace("</p>", "</p>").concat("<h2 class=mihead>Power ✦ Consumable (Minor Action)</h2><p class='mistat indent'>Drink it.</p>");
+		const c = buildMagic(parseMagic({ id: "item903", listing: { Name: "Zorb Oil", Category: "Consumable", Type: "Alchemical Item", Rarity: "Uncommon", SourceBook: "TST", Cost: "30 gp" }, html: two }));
+		assert.equal(c.notes.includes("powers-in-text"), true);
+		assert.equal(c.items[0].system.actionType, "standard");
 	});
 
 	test("what is built validates; the validator rejects a power with a bad action", () => {
