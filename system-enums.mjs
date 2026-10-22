@@ -74,6 +74,8 @@ export const ENUMS = {
 	equipmentTypesArmour: keysOf("equipmentTypesArmour"),
 	equipmentTypesAlt: keysOf("equipmentTypesAlt"),
 	consumableTypes: keysOf("consumableTypes"),
+	ritualTypes: keysOf("ritualTypes"),
+	timePeriods: keysOf("timePeriods"),
 	// rangeType's nested objects make a one-tab scan useless; these are the keys rangeData() in item.mjs handles.
 	rangeType: ["weapon", "melee", "touch", "reach", "range", "closeBurst", "closeBlast", "rangeBurst", "rangeBlast", "wall", "personal", "special"],
 };

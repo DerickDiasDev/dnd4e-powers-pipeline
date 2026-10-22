@@ -10,7 +10,7 @@
     "build": "node build-db.mjs",
     "validate": "node validate-db.mjs",
     "publish": "node publish-db.mjs",
-    "pipeline": "node parse-powers.mjs && node build-db.mjs && node validate-db.mjs && node parse-races.mjs && node build-races.mjs && node validate-races.mjs && node parse-classes.mjs && node build-classes.mjs && node validate-classes.mjs && node parse-options.mjs && node build-options.mjs && node validate-options.mjs && node parse-monsters.mjs && node build-monsters.mjs && node validate-monsters.mjs && node parse-gear.mjs && node build-gear.mjs && node validate-gear.mjs && node parse-magic.mjs && node build-magic.mjs && node validate-magic.mjs",
+    "pipeline": "node parse-powers.mjs && node build-db.mjs && node validate-db.mjs && node parse-races.mjs && node build-races.mjs && node validate-races.mjs && node parse-classes.mjs && node build-classes.mjs && node validate-classes.mjs && node parse-options.mjs && node build-options.mjs && node validate-options.mjs && node parse-monsters.mjs && node build-monsters.mjs && node validate-monsters.mjs && node parse-gear.mjs && node build-gear.mjs && node validate-gear.mjs && node parse-magic.mjs && node build-magic.mjs && node validate-magic.mjs && node parse-rituals.mjs && node build-rituals.mjs && node validate-rituals.mjs",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "test:pipeline": "node --test tests/pipeline.test.mjs",
     "test:sheet": "node --test tests/db-sim.test.mjs"

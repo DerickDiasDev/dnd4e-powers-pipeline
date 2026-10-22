@@ -1,6 +1,6 @@
 # dnd4e-powers-pipeline
 
-A private pipeline that turns a snapshot of the D&D 4th Edition compendium into a Foundry-ready database for the [`dnd4e`](https://github.com/EndlesNights/dnd4eBeta) system: powers, races, classes, feats, paragon paths, epic destinies, themes, backgrounds, monsters, mundane equipment and magic items, with their conditions, bonuses and resistances as ActiveEffects. The [`dnd4e-importer`](https://github.com/DerickDiasDev/foundry-dnd4e-importer) module reads that database and imports it into a world.
+A private pipeline that turns a snapshot of the D&D 4th Edition compendium into a Foundry-ready database for the [`dnd4e`](https://github.com/EndlesNights/dnd4eBeta) system: powers, races, classes, feats, paragon paths, epic destinies, themes, backgrounds, monsters, mundane equipment, magic items and rituals, with their conditions, bonuses and resistances as ActiveEffects. The [`dnd4e-importer`](https://github.com/DerickDiasDev/foundry-dnd4e-importer) module reads that database and imports it into a world.
 
 > **No book content is in this repository.** The compendium is copyrighted. `out/` (the downloaded and generated data) and `rules/` (reference PDFs) are git-ignored and stay on your machine; the tests run on invented text. Use it for your own games.
 
@@ -14,6 +14,7 @@ A private pipeline that turns a snapshot of the D&D 4th Edition compendium into 
 | Feats, paragon paths, epic destinies, themes, backgrounds | 3,272 / 577 / 115 / 116 / 817 | `feature` items (paths and destinies: one per feature) |
 | Monsters | 5,329 | NPC actors with their powers, traits and effects |
 | Magic items | 3,245 | one item each, with its levels (tiers), enhancement bonus and price |
+| Rituals | 360 | `ritual` items: category, level, time, duration, price, key skill and the result tables |
 | Mundane equipment | 481 | 492 `weapon`, `equipment`, `consumable` and `loot` items (weapons, armour incl. masterwork, shields, implements, ammunition, adventuring gear) |
 
 ## Quick start
@@ -39,7 +40,7 @@ validate-<kind>.mjs  out/db vs the installed system   ->  pass/fail, grouped by 
 publish-db.mjs       out/db                           ->  <Foundry data>/dnd4e-db     what the importer reads
 ```
 
-Kinds: `powers`, `races`, `classes`, `options` (feats, paths, destinies, themes, backgrounds), `monsters`, `gear` (mundane equipment) and `magic`. Build order matters in one place: `build-db.mjs` (powers) runs first, because races, classes, options and monsters link to the power index and `manifest.json` is rewritten by it.
+Kinds: `powers`, `races`, `classes`, `options` (feats, paths, destinies, themes, backgrounds), `monsters`, `gear` (mundane equipment), `magic` and `ritual`. Build order matters in one place: `build-db.mjs` (powers) runs first, because races, classes, options and monsters link to the power index and `manifest.json` is rewritten by it.
 
 Two design rules run through everything:
 
@@ -57,6 +58,7 @@ out/db/option/<feat|path|destiny|theme|background>/   _index.json  entries.json
 out/db/monster/   _index.json  <BOOK>.json            one file of actors per book
 out/db/gear/      _index.json  gear.json
 out/db/magic/     _index.json  <BOOK>.json            one file of entries per book
+out/db/ritual/    _index.json  rituals.json
 ```
 
 An index row is small and has what the importer lists (name, level, book, quality, notes, the ids of its items); the data files hold the Foundry document data.
@@ -120,6 +122,10 @@ Every `mihead` page of the weapon, armour, implement and item tables. The title 
 - **Slot items** (head, neck, arms, hands, feet, waist, ring), **wondrous items** (equipment of type other, so they can be equipped) and **alternative rewards** (boons, gifts, secrets...) are `equipment`. Consumables are `consumable`; familiars, mounts, companions, lairs and item sets are `loot`.
 - **Effects:** plain standing bonuses in a Property section become transferring effects with `equippedRec`, so the system suppresses them while the item is not equipped. A property whose numbers change with the level, or that is conditional, stays in the text.
 - **Powers** stay in the description (their numbers change with the level); the item records their headings in `flags.dnd4e.import.powers`.
+
+## Rituals
+
+One `ritual` item per page: `category` (the system's ritual types; Martial Practice is `martial`, Teleportation `travel`), `level`, `castTime` and `duration` in the sheet's time units (a time that is not a number of minutes, hours or days, such as "Standard action", is `spec` and kept in the text), `market` (the market price as printed), and `attribute` with the formula `@attribute`, so the sheet rolls the check of the first key skill. The description keeps the stats as printed (component cost, key skill and its alternatives, time, duration), the text, the result tables, and for the alchemical rituals the pages of the item they make at each level. Notes: `skill-choice` (several key skills, the first is used), `skill-unknown`, `category-unknown`.
 
 ## Tests
 
