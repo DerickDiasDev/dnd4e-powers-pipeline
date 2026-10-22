@@ -81,9 +81,9 @@ export function baseOf(m) {
 
 const para = p => (p.bullet ? `<li>${esc(p.text)}</li>` : `<p>${esc(p.text)}</p>`);
 /** Description HTML: flavour, the intro of artifacts, the enhancement and critical lines, then each section. */
-export function describeHtml(m) {
+export function describeHtml(m, { skip = null, flavour = true } = {}) {
 	const out = [];
-	if (m.flavor) out.push(`<p><em>${esc(m.flavor)}</em></p>`);
+	if (m.flavor && flavour) out.push(`<p><em>${esc(m.flavor)}</em></p>`);
 	for (const text of m.intro ?? []) out.push(`<p>${esc(text)}</p>`);
 	const lines = [];
 	for (const key of ["Weapon", "Armor", "Implement", "Enhancement Bonus", "Enhancement", "Critical", "Requirement", "Alchemical Item", "Key Skill", "Formula Cost", "Time", "Ammunition", "Special"]) {
@@ -91,6 +91,7 @@ export function describeHtml(m) {
 	}
 	out.push(...lines);
 	for (const s of m.sections) {
+		if (s === skip) continue;
 		if (s.heading) out.push(`<h3>${esc(s.heading)}</h3>`);
 		let list = false;
 		for (const p of s.paragraphs) {
@@ -195,7 +196,7 @@ export function buildMagic(m, mundane = new Map()) {
 
 	const notes = [...m.notes, ...built.notes];
 	const own = item.type === "consumable" ? buildItemPowers(m) : [];
-	if (own.length) consumablePower(item, own[0]);
+	if (own.length) consumablePower(item, own[0], m);
 	// The powers of an item that can be equipped are power items the system copies to the actor while it is worn; a consumable's stay in its text.
 	const powers = ["equipment", "weapon"].includes(item.type) ? buildItemPowers(m) : [];
 	if (powers.length) notes.push("powers-linked");
@@ -214,11 +215,17 @@ const POWER_FIELDS = ["actionType", "rangeType", "rangePower", "area", "target",
  * Merges the first power of a consumable into the consumable: it is used from the item (a chat card like a power's, one use, the item
  * is destroyed with it). A trigger, requirement or special line has no field on a consumable, so it goes in front of the effect text.
  */
-export function consumablePower(item, power) {
+export function consumablePower(item, power, m) {
 	const p = power.system;
+	// The power is on the item, so its section leaves the description; the flavour is what the chat card shows above the power.
+	const section = m.sections.filter(x => isPower(x.heading) && x.paragraphs.length)[0];
+	item.system.description = { value: describeHtml(m, { skip: section, flavour: !m.flavor }), chat: m.flavor ? `<p><em>${esc(m.flavor)}</em></p>` : "" };
 	for (const key of POWER_FIELDS) if (p[key] !== undefined) item.system[key] = structuredClone(p[key]);
 	const lead = ["trigger", "requirement", "special"].filter(k => p[k]).map(k => `${k[0].toUpperCase()}${k.slice(1)}: ${p[k]}`);
 	if (lead.length) item.system.effect = { ...item.system.effect, detail: [...lead, item.system.effect?.detail].filter(Boolean).join("\n") };
+	// What the attack does on a hit that the converter has no field for ("and ongoing 5 acid damage (save ends)") is the hit's text.
+	const attackText = section.paragraphs[0]?.text.match(/vs\.?\s+\w+;?\s*(.*)$/i)?.[1];
+	if (item.system.attack?.isAttack && attackText && !item.system.hit.detail) item.system.hit.detail = attackText;
 	Object.assign(item.system, { useType: "item", autoGenChatPowerCard: true });
 	item.system.uses = { ...item.system.uses, autoDestroy: true };
 	item.effects = structuredClone(power.effects ?? []);
