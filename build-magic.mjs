@@ -14,6 +14,8 @@
  *
  * An item that exists at several levels is one entry with `tiers` ({level, enhancement, price}); the item data is built at the
  * first tier and the importer patches level, enhancement and price for the tier the player picks.
+ * The powers of an item that can be equipped (not a consumable) are built as `power` items (item-powers.mjs) and kept in `powers`;
+ * the importer creates them next to the item and links them, and the system copies them to the actor while the item is equipped.
  * Standing bonuses written in a Property section become effects that transfer, and are suppressed while the item is not
  * equipped. Powers stay in the description (their numbers change with the level).
  *
@@ -28,6 +30,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { attachFeatureEffects } from "./build-effects.mjs";
 import { findBase, GROUP_KEYS, IMPLEMENT_KEYS } from "./build-gear.mjs";
+import { buildItemPowers } from "./item-powers.mjs";
 import { ENUMS } from "./system-enums.mjs";
 
 export const MAGIC_SCHEMA_VERSION = 1;
@@ -189,10 +192,14 @@ export function buildMagic(m, mundane = new Map()) {
 	}
 
 	const notes = [...m.notes, ...built.notes];
-	if (powerHeadings(m).length) notes.push("powers-in-text");
+	// The powers of an item that can be equipped are power items the system copies to the actor while it is worn; a consumable's stay in its text.
+	const powers = ["equipment", "weapon"].includes(item.type) ? buildItemPowers(m) : [];
+	if (powers.length) notes.push("powers-linked");
+	else if (powerHeadings(m).length) notes.push("powers-in-text");
+	if (powers.some(p => (p.flags.dnd4e.import.review ?? []).some(r => r.startsWith("attack-unparsed")))) notes.push("power-attack-text");
 	return {
 		id: m.id, _id: item._id, name: m.name, category: m.category, type: m.type, rarity: m.rarity, source: m.sourceCode, sources: m.sources,
-		tiers: m.tiers, scales: m.scales, base, notes, items: [item],
+		tiers: m.tiers, scales: m.scales, base, notes, items: [item], powers,
 	};
 }
 
@@ -200,7 +207,7 @@ export function buildMagic(m, mundane = new Map()) {
 export const indexRow = (entry, file) => ({
 	id: entry.id, _id: entry._id, name: entry.name, category: entry.category, type: entry.type, rarity: entry.rarity,
 	source: entry.source, sources: entry.sources, tiers: entry.tiers, base: entry.base, notes: entry.notes,
-	itemType: entry.items[0].type, effects: entry.items[0].effects.length, powers: entry.items[0].flags.dnd4e.import.powers.length,
+	itemType: entry.items[0].type, effects: entry.items[0].effects.length, powers: entry.items[0].flags.dnd4e.import.powers.length, powerItems: entry.powers.length,
 	file, items: entry.items.map(i => i._id),
 });
 

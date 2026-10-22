@@ -57,6 +57,27 @@ export function validateMagic(entries, index) {
 		const row = rows.get(e._id);
 		if (!row) fail(n, "entry is not in the index");
 		else if (JSON.stringify(row.items) !== JSON.stringify([item._id])) fail(n, "index items differ from the entry's items");
+		else if (row.powerItems !== (e.powers ?? []).length) fail(n, "the index's power count differs from the entry's powers");
+
+		// The powers the system copies to the actor while the item is equipped.
+		if ((e.powers ?? []).length && !["equipment", "weapon"].includes(item.type)) fail(n, "powers only on items that can be equipped");
+		for (const p of e.powers ?? []) {
+			const s = p.system;
+			if (p.type !== "power") fail(n, `a power of the item has type "${p.type}"`);
+			if (!/^[A-Za-z0-9]{16}$/.test(p._id) || seen.has(p._id)) fail(n, "a power's _id is not a unique 16-char id");
+			seen.add(p._id);
+			inList(n, "power useType", s.useType, ENUMS.useType);
+			inList(n, "power actionType", s.actionType, ENUMS.actionType);
+			inList(n, "power rangeType", s.rangeType, ENUMS.rangeType);
+			inList(n, "power powerSubtype", s.powerSubtype, ENUMS.powerSubtype);
+			inList(n, "power attack.def", s.attack.def, ENUMS.defences);
+			if (s.attack.isAttack && !/^-?\d+$/.test(s.attack.formula ?? "")) fail(n, "a power's attack without a number");
+			if (s.hit.isDamage && !/^(?:\d+d\d+(?: [+-] \d+)?|\d+)$/.test(s.hit.formula ?? "")) fail(n, `a power's damage formula "${s.hit.formula}"`);
+			const f = p.flags.dnd4e.import;
+			if (f.kind !== "magic-power" || f.id !== e.id || f.role !== "power") fail(n, "a power's import flags");
+			for (const sc of f.scaling ?? []) if (!sc.levels.length || !sc.levels.every(Number.isInteger) || !sc.text) fail(n, "a power's scaling entry");
+			for (const problem of effectProblems(p, effectIds)) fail(n, `power effect: ${problem}`);
+		}
 	}
 	return errors;
 }
