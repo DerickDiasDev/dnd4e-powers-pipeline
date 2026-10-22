@@ -18,6 +18,8 @@
  *   F. magic      a level chosen at import gives its enhancement and price; plain bonuses work only while equipped; a magic weapon based on a
  *                 mundane one rolls its dice; magic armour of one kind is that armour plus the enhancement
  *   G. rituals    a ritual is accepted by the model with its category, times and the skill it rolls
+ *   H. extras     a deity writes its name into the sheet; diseases and companions, poisons, traps (NPCs with printed numbers) and glossary entries
+ *                 (journal entries) are accepted by the model
  */
 const MODULE_ID = "dnd4e-importer";
 const base = (game.settings.get(MODULE_ID, "dbPath") || "dnd4e-db").replace(/^\/+|\/+$/g, "");
@@ -358,6 +360,56 @@ await run("G rituals", "a ritual is accepted by the model, with its category, ti
 	eq("G rituals", "alarm: 10 minutes to cast, lasts 8 hours, market price 50 gp", [alarm.system.castTime.value, alarm.system.castTime.units, alarm.system.duration.value, alarm.system.duration.units, alarm.system.market], ["10", "minute", "8", "hour", "50 gp"]);
 	eq("G rituals", "alarm: rolls Arcana, and the path points at a real number on the sheet", [alarm.system.attribute, Number.isFinite(foundry.utils.getProperty(a.system, alarm.system.attribute))], ["skills.arc.total", true]);
 	eq("G rituals", "alchemist's acid is an alchemical (volatile) ritual", a.items.find(i => i.name === "Alchemist's Acid").system.subtype, "alchemical");
+});
+
+/* ======================================================= H. the rest: deities, diseases, companions, poisons, traps */
+const optionModule = await import(`/modules/${MODULE_ID}/scripts/option.mjs`);
+
+await run("H extras", "a deity writes its name into the sheet; a disease and a companion are accepted as features", async () => {
+	const deity = await optionEntry("deity", "Avandra");
+	const plain = make(pc());
+	const actor = patched(pc(), optionModule.optionPatch(deity.apply));
+	eq("H extras", "avandra: the deity field of the sheet", actor.system.details.deity, "Avandra");
+	const a = make(pc(), { items: [...clone(deity.items), ...clone((await optionEntry("disease", "Echo Madness")).items), ...clone((await optionEntry("companion", "Bear Animal Companion")).items)] });
+	eq("H extras", "three features of the groups Deity, Disease and Animal Companion", a.items.map(i => [i.type, i.system.featureType, i.system.featureGroup]).sort(), [["feature", "other", "Animal Companion"], ["feature", "other", "Deity"], ["feature", "other", "Disease"]]);
+	eq("H extras", "the disease keeps its level", a.items.find(i => i.name === "Echo Madness").system.level, 9);
+	eq("H extras", "a deity changes nothing else on the sheet", [a.system.defences.ac.value, a.system.skills.prc.total], [plain.system.defences.ac.value, plain.system.skills.prc.total]);
+});
+
+await run("H extras", "poisons are consumables of type poison, in both page layouts", async () => {
+	const rows = magicIndex.filter(r => r.category === "Poison");
+	const items = [];
+	// Two poisons share the name Carrion Crawler Brain Juice: the DMG one (poison3) is the older layout.
+	for (const id of ["poison0710", "poison3"]) {
+		const row = rows.find(r => r.id === id);
+		if (!row) throw new Error(`poison "${id}" is not in the database`);
+		items.push(...magicModule.planMagicImport(await magicEntry(row), row, new Set(), {}).create);
+	}
+	const a = make(pc(), { items });
+	eq("H extras", "bloodroot (newer page) and carrion crawler brain juice (DMG, older page): consumables of type poison", a.items.map(i => [i.type, i.system.consumableType]), [["consumable", "poison"], ["consumable", "poison"]]);
+	eq("H extras", "the DMG poison costs 250 gp and is level 5", [a.items[1].system.price, a.items[1].system.level], [250, 5]);
+});
+
+await run("H extras", "a trap is an NPC with its printed numbers and its text", async () => {
+	const index = await get("trap/_index.json");
+	const row = index.find(r => r.name === "False-Floor Pit (Elite)");
+	if (!row) throw new Error("trap \"False-Floor Pit (Elite)\" is not in the database");
+	const trap = (await get(`trap/${row.file}`)).find(a => a._id === row._id);
+	const a = make(trap);
+	eq("H extras", "false-floor pit (elite): level 1, 200 XP, elite warder", [a.system.details.level, a.system.details.exp, a.system.details.role.secondary, a.system.details.role.primary], [1, 200, "elite", "warder"]);
+	eq("H extras", "no printed hit points: 1, and no powers", [a.system.attributes.hp.max, a.items.size], [1, 0]);
+	record("H extras", "the biography has the trigger and the countermeasures", /Trigger/.test(a.system.biography) && /Countermeasures/.test(a.system.biography), a.system.biography.slice(0, 120), "Trigger and Countermeasures");
+	const stalagmite = (await get(`trap/${index.find(r => r.name === "Crystalshock Stalagmite").file}`)).find(x => x.name === "Crystalshock Stalagmite");
+	const h = make(stalagmite);
+	eq("H extras", "crystalshock stalagmite: 90 hit points, AC 24, Fortitude 21, Reflex 5", [h.system.attributes.hp.max, h.system.defences.ac.value, h.system.defences.fort.value, h.system.defences.ref.value], [90, 24, 21, 5]);
+});
+
+await run("H extras", "a glossary entry is a journal entry with one text page", async () => {
+	const index = await get("glossary/_index.json");
+	const row = index.find(r => r.name === "Athletics");
+	const entry = (await get("glossary/entries.json")).find(e => e._id === row._id);
+	const journal = new JournalEntry.implementation(clone(entry.journal));
+	eq("H extras", "athletics: one text page with the rules", [journal.pages.size, journal.pages.contents[0].type, journal.pages.contents[0].text.content.length > 3000], [1, "text", true]);
 });
 
 /* ======================================================= report */
