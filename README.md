@@ -14,6 +14,8 @@ A private pipeline that turns a snapshot of the D&D 4th Edition compendium into 
 | Feats, paragon paths, epic destinies, themes, backgrounds | 3,272 / 577 / 115 / 116 / 817 | `feature` items (paths and destinies: one per feature) |
 | Monsters | 5,329 | NPC actors with their powers, traits and effects |
 | Magic items | 3,245 | one item each, with its levels (tiers), enhancement bonus and price |
+| Deities, diseases, companions and familiars | 134 / 69 / 194 | `feature` items, listed with the character options |
+| Poisons | 38 | `consumable` items of type poison, with the magic items |
 | Rituals | 360 | `ritual` items: category, level, time, duration, price, key skill and the result tables |
 | Mundane equipment | 481 | 492 `weapon`, `equipment`, `consumable` and `loot` items (weapons, armour incl. masterwork, shields, implements, ammunition, adventuring gear) |
 
@@ -122,6 +124,12 @@ Every `mihead` page of the weapon, armour, implement and item tables. The title 
 - **Slot items** (head, neck, arms, hands, feet, waist, ring), **wondrous items** (equipment of type other, so they can be equipped) and **alternative rewards** (boons, gifts, secrets...) are `equipment`. Consumables are `consumable`; familiars, mounts, companions, lairs and item sets are `loot`.
 - **Effects:** plain standing bonuses in a Property section become transferring effects with `equippedRec`, so the system suppresses them while the item is not equipped. A property whose numbers change with the level, or that is conditional, stays in the text.
 - **Powers** stay in the description (their numbers change with the level); the item records their headings in `flags.dnd4e.import.powers`.
+
+## Deities, diseases and companions
+
+They are written where the character options are (`out/db/option/<deity|disease|companion>/`, the same shape), so the importer lists them in the options window. Each is one `feature` item (`featureType: other`, `featureGroup` says what it is) whose description is the page. A **deity** keeps its header facts (type, alignment, domains, sphere, priests...) and `apply.deity` lets the importer write its name into the sheet's deity field; its domains are searchable. A **disease** keeps its level (or none, for the variable-level ones), its stages and the check between them. A **companion** (animal and elemental companions, familiars, mounts, summoned creatures) keeps its stat block as text: their numbers depend on the master's level, so they cannot be a fixed actor.
+
+**Poisons** go through the magic item stage (both page layouts, the older one with the attack and the failed saves as lines): a `consumable` of type poison with its level and price.
 
 ## Rituals
 

@@ -163,8 +163,8 @@ function itemFor(m, mundane) {
 		const enhances = m.category === "Neck" && /fortitude|reflex|will/i.test(m.stats["Enhancement Bonus"] ?? "");
 		return { type: "equipment", enhancePath: enhances ? "system.armour.enhance" : null, notes, system: { ...common, armour: { type: SLOT_TYPES[m.category], subtype: "", enhance: enhances ? tier.enhancement ?? 0 : 0 } } };
 	}
-	if (m.category === "Consumable") {
-		return { type: "consumable", enhancePath: null, notes, system: { ...common, consumableType: CONSUMABLE_TYPES[m.type.toLowerCase()] ?? "other", uses: { autoDestroy: false, max: "1", value: 1, per: "" } } };
+	if (m.category === "Consumable" || m.category === "Poison") {
+		return { type: "consumable", enhancePath: null, notes, system: { ...common, consumableType: m.category === "Poison" ? "poison" : CONSUMABLE_TYPES[m.type.toLowerCase()] ?? "other", uses: { autoDestroy: false, max: "1", value: 1, per: "" } } };
 	}
 	return { type: "loot", enhancePath: null, notes, system: common };
 }

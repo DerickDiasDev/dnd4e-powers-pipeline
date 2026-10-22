@@ -36,8 +36,9 @@ export function parseTiers(html) {
 
 /** "Level 8 Uncommon" / "Level 4+ Uncommon" from the title span. */
 export function parseLevelLine(html) {
-	const m = html.match(/<span class=milevel[^>]*>\s*Level\s*(\d+)(\+?)\s*([^<]*)<\/span>/i);
-	return m ? { level: Number(m[1]), scales: Boolean(m[2]), rarity: m[3].trim() } : null;
+	// The older poison pages print "Level 5 Poison" in a span of class `level`: the word is the kind of item, not a rarity.
+	const m = html.match(/<span class=(?:milevel|level)[^>]*>\s*Level\s*(\d+)(\+?)\s*([^<]*)<\/span>/i);
+	return m ? { level: Number(m[1]), scales: Boolean(m[2]), rarity: /^poison$/i.test(m[3].trim()) ? "" : m[3].trim() } : null;
 }
 
 /**
@@ -83,8 +84,11 @@ export function parseMagic(entry) {
 	const level = parseLevelLine(html);
 	const tiers = parseTiers(html);
 	const { stats, intro, sections } = parseBody(html);
+	// The older poison pages have no sections: one paragraph of lines, the attack and what follows each failed save.
+	const legacy = !sections.length ? html.match(/<p>([\s\S]*?)<\/p>/i)?.[1] : null;
+	if (legacy) sections.push({ heading: "Poison", paragraphs: txt(legacy).split("\n").filter(Boolean).map(text => ({ text })) });
 	const published = txt(entry.html.match(/<p class=publishedIn>([\s\S]*?)<\/p>/i)?.[1] ?? "");
-	const slotLine = Object.entries(stats).find(([k]) => / Slot$/i.test(k) || /^(?:Wondrous Item|Alternative Reward|Mount|Familiar|Companion|Lair)$/i.test(k));
+	const slotLine = Object.entries(stats).find(([k]) => / Slot$/i.test(k) || /^(?:Wondrous Item|Alternative Reward|Mount|Familiar|Companion|Lair|Consumable)$/i.test(k));
 	const listing = entry.listing;
 	const sources = sourcesOf(listing);
 	const notes = [];
@@ -94,10 +98,10 @@ export function parseMagic(entry) {
 	return {
 		id: entry.id,
 		name: txt(listing.Name),
-		category: listing.Category ?? (entry.id.startsWith("weapon") ? "Weapon" : entry.id.startsWith("armor") ? "Armor" : "Implement"),
+		category: listing.Category ?? (entry.id.startsWith("weapon") ? "Weapon" : entry.id.startsWith("armor") ? "Armor" : entry.id.startsWith("poison") ? "Poison" : "Implement"),
 		type: String(listing.Type ?? "").trim(),
 		rarity: level?.rarity ?? listing.Rarity ?? "",
-		flavor: txt(html.match(/<p class=miflavor>([\s\S]*?)<\/p>/i)?.[1] ?? ""),
+		flavor: txt(html.match(/<p class=(?:miflavor|flavor)>([\s\S]*?)<\/p>/i)?.[1] ?? ""),
 		sources, sourceCode: sources[0] ?? null, published,
 		// A page without a table has one tier; a printed "+4" in the enhancement line (an artifact or unique item) is its bonus.
 		tiers: single ? [{ level: level?.level ?? null, enhancement: toNumber(String(stats["Enhancement Bonus"] ?? stats.Enhancement ?? "").match(/\+\s*\d+/)?.[0]), price }] : tiers,
@@ -110,7 +114,7 @@ export function parseMagic(entry) {
 }
 
 /** True for the pages of magic items (the mundane ones use another layout, see parse-gear.mjs). */
-export const isMagicPage = entry => /<h1 class=mihead/i.test(entry.html);
+export const isMagicPage = entry => /<h1 class=(?:mihead|poison)/i.test(entry.html);
 
 async function main() {
 	const argv = process.argv.slice(2);
@@ -119,7 +123,7 @@ async function main() {
 	const inDir = path.resolve(here, flag("in", "out"));
 	const outDir = path.resolve(here, flag("out", "out/parsed"));
 	const parsed = [];
-	for (const name of ["weapon", "armor", "implement", "item"]) {
+	for (const name of ["weapon", "armor", "implement", "item", "poison"]) {
 		const rows = JSON.parse(await readFile(path.join(inDir, `${name}.json`), "utf8")).filter(isMagicPage);
 		parsed.push(...rows.map(parseMagic));
 	}
