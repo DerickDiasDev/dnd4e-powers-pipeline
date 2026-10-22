@@ -17,6 +17,7 @@
  *   E. equipment  armour, shields and weapons change the sheet as the book says (AC, speed, armour check, dice, proficiency); gear is accepted
  *   F. magic      a level chosen at import gives its enhancement and price; plain bonuses work only while equipped; a magic weapon based on a
  *                 mundane one rolls its dice; magic armour of one kind is that armour plus the enhancement
+ *   G. rituals    a ritual is accepted by the model with its category, times and the skill it rolls
  */
 const MODULE_ID = "dnd4e-importer";
 const base = (game.settings.get(MODULE_ID, "dbPath") || "dnd4e-db").replace(/^\/+|\/+$/g, "");
@@ -340,6 +341,23 @@ await run("F magic", "every item with effects is accepted by the model and its e
 	const expected = items.reduce((n, i) => n + i.effects.length, 0);
 	eq("F magic", `${rows.length} items with effects: all their effects are on the actor`, [...packed.allApplicableEffects()].length, expected);
 	eq("F magic", "carried, none of them is active", [...packed.allApplicableEffects()].filter(e => !e.isSuppressed).length, 0);
+});
+
+/* ======================================================= G. rituals */
+const ritualIndex = await get("ritual/_index.json");
+const ritualItem = async name => {
+	const row = ritualIndex.find(r => r.name === name);
+	if (!row) throw new Error(`ritual "${name}" is not in the database`);
+	return (await get("ritual/rituals.json")).find(e => e._id === row._id).items;
+};
+
+await run("G rituals", "a ritual is accepted by the model, with its category, times and the skill it rolls", async () => {
+	const a = make(pc(), { items: [...await ritualItem("Alarm"), ...await ritualItem("Alchemist's Acid")] });
+	const alarm = a.items.find(i => i.name === "Alarm");
+	eq("G rituals", "alarm: a level 1 warding ritual of the ritual kind", [alarm.type, alarm.system.level, alarm.system.category, alarm.system.subtype], ["ritual", 1, "warding", "ritual"]);
+	eq("G rituals", "alarm: 10 minutes to cast, lasts 8 hours, market price 50 gp", [alarm.system.castTime.value, alarm.system.castTime.units, alarm.system.duration.value, alarm.system.duration.units, alarm.system.market], ["10", "minute", "8", "hour", "50 gp"]);
+	eq("G rituals", "alarm: rolls Arcana, and the path points at a real number on the sheet", [alarm.system.attribute, Number.isFinite(foundry.utils.getProperty(a.system, alarm.system.attribute))], ["skills.arc.total", true]);
+	eq("G rituals", "alchemist's acid is an alchemical (volatile) ritual", a.items.find(i => i.name === "Alchemist's Acid").system.subtype, "alchemical");
 });
 
 /* ======================================================= report */
