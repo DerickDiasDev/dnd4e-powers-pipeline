@@ -14,7 +14,8 @@ A private pipeline that turns a snapshot of the D&D 4th Edition compendium into 
 | Feats, paragon paths, epic destinies, themes, backgrounds | 3,272 / 577 / 115 / 116 / 817 | `feature` items (paths and destinies: one per feature) |
 | Monsters | 5,329 | NPC actors with their powers, traits and effects |
 | Magic items | 3,245 | one item each, with its levels (tiers), enhancement bonus and price |
-| Deities, diseases, companions and familiars | 134 / 69 / 194 | `feature` items, listed with the character options |
+| Deities, diseases, familiars and the old companions | 134 / 69 / 105 | `feature` items, listed with the character options |
+| Companion creatures | 89 | NPC templates (animal, fey beast and elemental companions, summoned creatures, mounts) whose numbers are made from the master's |
 | Poisons | 38 | `consumable` items of type poison, with the magic items |
 | Rules glossary | 545 | journal entries (one text page each) |
 | Traps, hazards, terrain | 776 | `Hazard` actors with the printed numbers, detection, countermeasures, the text and the attacks as powers |
@@ -130,6 +131,8 @@ Every `mihead` page of the weapon, armour, implement and item tables. The title 
 ## Deities, diseases and companions
 
 They are written where the character options are (`out/db/option/<deity|disease|companion>/`, the same shape), so the importer lists them in the options window. Each is one `feature` item (`featureType: other`, `featureGroup` says what it is) whose description is the page. A **deity** keeps its header facts (type, alignment, domains, sphere, priests...) and `apply.deity` lets the importer write its name into the sheet's deity field; its domains are searchable. A **disease** keeps its level (or none, for the variable-level ones), its stages and the check between them. A **companion** (animal and elemental companions, familiars, mounts, summoned creatures) keeps its stat block as text: their numbers depend on the master's level, so they cannot be a fixed actor.
+
+**Companion creatures** are the exception: animal, fey beast and elemental companions, summoned creatures and mounts are creatures with a stat block, and become NPC templates (`parse-companions.mjs`, `build-companions.mjs`, `validate-companions.mjs`, `out/db/companion/`, the monsters' index rows). Almost none has fixed numbers: they are the master's ("HP your bloodied value", "Defenses your defenses + 2", "AC 13, Fortitude 15... (add your level to each defense)", "Initiative equal to yours", "your level + 5 vs. AC", "1d12 + your Wisdom modifier damage" with the lines that change it at levels 13 and 23). The template is level 0 with one hit point; how each number is made is in `flags.dnd4e.import.companion` (`hp`: bloodied/surge/fixed, `defences`: master/levelPlus/fixed, `initiative`, `perception`) and in each power (`attackLevelOffset`, `companionDamage` = `{from, dice, flat, mods, half}` per level), and the importer fills them in. Their powers and traits come from the same converter as the monsters’ (the heading’s icon, keywords, action and usage; auras are traits). Familiars and the old formula-based beast companions are not stat blocks and stay `feature` items. Notes: `master-numbers`.
 
 **Poisons** go through the magic item stage (both page layouts, the older one with the attack and the failed saves as lines): a `consumable` of type poison with its level and price.
 

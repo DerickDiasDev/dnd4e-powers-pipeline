@@ -21,6 +21,7 @@
  *   H. extras     a deity writes its name into the sheet; diseases and companions, poisons, traps (NPCs with printed numbers) and glossary entries
  *                 (journal entries) are accepted by the model
  *   I. item powers the powers of a magic item are power items with the numbers of the level it is imported at (the equip/copy flow needs a world: see the README)
+ *   L. companions a companion creature is an NPC with its master's numbers (hit points, defences, attack, damage) or a level
  *   K. consumables a consumable is its own power: it takes the attack and damage of the level it is imported at
  *   J. armour base a magic armour that names several kinds takes the bonus, penalties and kind of the armour or shield it is based on
  */
@@ -488,6 +489,25 @@ await run("K consumables", "a consumable is its own power: the attack and damage
 	eq("K consumables", "it has no power items to create; ranged 5/10, standard action", [at(11).powers.length, high.system.actionType, high.system.rangeType], [0, "standard", "range"]);
 	const a = make(pc(), { items: [first, high] });
 	eq("K consumables", "the model accepts both", a.items.filter(i => i.type === "consumable").length, 2);
+});
+
+/* ======================================================= L. companions */
+const companionModule = await import(`/modules/${MODULE_ID}/scripts/companion.mjs`);
+await run("L companions", "a companion is an NPC with its master's numbers: hit points, defences, attack and damage", async () => {
+	const index = await get("companion/_index.json");
+	const row = index.find(r => r.name === "Bear Animal Companion");
+	if (!row) throw new Error("the bear companion is not in the database");
+	const template = (await get(`companion/${row.file}`)).find(a => a._id === row._id);
+	const master = make(pc());
+	const m = companionModule.masterOf(master);
+	const bear = make(companionModule.applyCompanion(clone(template), m, m.level));
+	eq("L companions", "the bear: an NPC whose hit points are the master's bloodied value", [bear.type, bear.system.attributes.hp.max], ["NPC", Math.max(1, m.bloodied)]);
+	eq("L companions", "its defences are the printed ones plus the master's level (AC 13 + level, Reflex 11 + level)", [bear.system.defences.ac.base, bear.system.defences.ref.base], [13 + m.level, 11 + m.level]);
+	const bite = bear.items.contents.find(i => i.type === "power");
+	eq("L companions", "its attack is the master's level + 5 against AC, and its damage has the master's modifiers", [bite.system.attack.formula, bite.system.attack.def, /^1d12/.test(bite.system.hit.formula)], [String(m.level + 5), "ac", true]);
+	const only = companionModule.applyCompanion(clone(template), null, 10);
+	eq("L companions", "with only a level: 1 hit point and a note that the sheet was missing", [only.system.attributes.hp.max, only.flags.dnd4e.import.review.includes("no-master-sheet")], [1, true]);
+	record("L companions", "the model accepts the companion made with only a level", make(only).items.size >= 1, make(only).items.size, "its power and trait items");
 });
 
 /* ======================================================= report */

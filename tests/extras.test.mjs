@@ -120,7 +120,7 @@ describe("the real database", () => {
 			assert.equal(validateExtras(kind, entries, index).size, 0, kind);
 			counts[kind] = entries.length;
 		}
-		assert.ok(counts.deity >= 130 && counts.disease >= 60 && counts.companion >= 190, JSON.stringify(counts));
+		assert.ok(counts.deity >= 130 && counts.disease >= 60 && counts.companion >= 100, JSON.stringify(counts));
 		const deities = JSON.parse(await readFile(path.join(dir, "deity", "entries.json"), "utf8"));
 		assert.equal(deities.find(e => e.name === "Avandra").apply.deity, "Avandra");
 	});

@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { CREATURE_CATEGORIES } from "./parse-companions.mjs";
 
 export const EXTRAS_SCHEMA_VERSION = 1;
 export const EXTRA_KINDS = ["deity", "disease", "companion"];
@@ -84,7 +85,8 @@ async function main() {
 	const manifest = JSON.parse(await readFile(manifestFile, "utf8"));
 	manifest.options ??= {};
 	for (const kind of EXTRA_KINDS) {
-		const entries = parsed.filter(p => p.kind === kind).map(buildExtra);
+		// The companions that are creatures are NPCs (build-companions.mjs); what stays here is the familiars and the old beast companions.
+		const entries = parsed.filter(p => p.kind === kind && !(kind === "companion" && CREATURE_CATEGORIES.includes(p.category))).map(buildExtra);
 		await mkdir(path.join(dbDir, "option", kind), { recursive: true });
 		await writeFile(path.join(dbDir, "option", kind, "entries.json"), JSON.stringify(entries));
 		await writeFile(path.join(dbDir, "option", kind, "_index.json"), JSON.stringify(entries.map(indexRow)));
