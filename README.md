@@ -125,7 +125,7 @@ Every `mihead` page of the weapon, armour, implement and item tables. The title 
 
 ## Rituals
 
-One `ritual` item per page: `category` (the system's ritual types; Martial Practice is `martial`, Teleportation `travel`), `level`, `castTime` and `duration` in the sheet's time units (a time that is not a number of minutes, hours or days, such as "Standard action", is `spec` and kept in the text), `market` (the market price as printed), and `attribute` with the formula `@attribute`, so the sheet rolls the check of the first key skill. The description keeps the stats as printed (component cost, key skill and its alternatives, time, duration), the text, the result tables, and for the alchemical rituals the pages of the item they make at each level. Notes: `skill-choice` (several key skills, the first is used), `skill-unknown`, `category-unknown`.
+One `ritual` item per page: `category` (the system's ritual types; Martial Practice is `martial`, Teleportation `travel`), `level`, `castTime` and `duration` in the sheet's time units (a time that is not a number of minutes, hours or days, such as "Standard action", is `spec` and kept in the text), `market` (the market price as printed), and `attribute` with the formula `@attribute`, so the sheet rolls the check of the first key skill. The description keeps what the sheet cannot show (the component cost, the other key skills, a time or duration with more words than a number and a unit), the text, the result tables, and for the alchemical rituals the pages of the item they make at each level. Notes: `skill-choice` (several key skills, the first is used), `skill-unknown`, `category-unknown`.
 
 ## Tests
 

@@ -25,7 +25,15 @@ const stableId = seed => createHash("sha1").update(`dnd4e:ritual:${seed}`).diges
 export function describeHtml(r) {
 	const out = [];
 	if (r.flavor) out.push(`<p><em>${esc(r.flavor)}</em></p>`);
-	const stats = [["Component Cost", r.componentCost], ["Market Price", r.marketText], ["Key Skill", r.keySkill], ["Time", r.time.text], ["Duration", r.duration.text]];
+	// The sheet already shows the category, level, cast time, duration and market price from its own fields, and rolls the key skill:
+	// only what it cannot show is repeated here (the component cost, the other key skills, a time or duration with more words).
+	const plain = text => /^(?:\d+ (?:round|minute|hour|day|month|year)s?|instantaneous|permanent)$/i.test(text ?? "");
+	const stats = [
+		["Component Cost", r.componentCost],
+		["Key Skill", r.skills.length === 1 ? null : r.keySkill],
+		["Time", plain(r.time.text) ? null : r.time.text],
+		["Duration", plain(r.duration.text) ? null : r.duration.text],
+	];
 	for (const [label, value] of stats) if (value) out.push(`<p><strong>${label}:</strong> ${esc(value)}</p>`);
 	let table = null;
 	const flush = () => { if (table) { out.push(`<table>${table.map((cells, i) => `<tr>${cells.map(c => `<${i ? "td" : "th"}>${esc(c)}</${i ? "td" : "th"}>`).join("")}</tr>`).join("")}</table>`); table = null; } };
