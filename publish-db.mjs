@@ -2,7 +2,7 @@
  * Copies the generated database (out/db) into the Foundry data folder, where the dnd4e-importer module reads it.
  * Foundry serves files under its data folder, so the module can fetch <data>/dnd4e-db/power/_index.json.
  *
- * Only the database folders (`power/`, `race/`, `class/`, `option/`, `monster/`, `gear/`, `magic/`, `ritual/`, `trap/`) and `manifest.json` inside the target are replaced; nothing else in the target is touched.
+ * Only the database folders (`power/`, `race/`, `class/`, `option/`, `monster/`, `gear/`, `magic/`, `ritual/`, `trap/`, `glossary/`) and `manifest.json` inside the target are replaced; nothing else in the target is touched.
  *
  * Usage: node publish-db.mjs [--to G:/Foundry/FoundryVTT/Data/dnd4e-db]   (or set DND4E_PUBLISH_TO)
  */
@@ -30,6 +30,7 @@ await rm(path.join(to, "gear"), { recursive: true, force: true });
 await rm(path.join(to, "magic"), { recursive: true, force: true });
 await rm(path.join(to, "ritual"), { recursive: true, force: true });
 await rm(path.join(to, "trap"), { recursive: true, force: true });
+await rm(path.join(to, "glossary"), { recursive: true, force: true });
 await rm(path.join(to, "manifest.json"), { force: true });
 await cp(path.join(from, "power"), path.join(to, "power"), { recursive: true });
 await cp(path.join(from, "race"), path.join(to, "race"), { recursive: true }).catch(() => console.log("(no race/ in out/db: run build-races.mjs)"));
@@ -40,8 +41,9 @@ await cp(path.join(from, "gear"), path.join(to, "gear"), { recursive: true }).ca
 await cp(path.join(from, "magic"), path.join(to, "magic"), { recursive: true }).catch(() => console.log("(no magic/ in out/db: run build-magic.mjs)"));
 await cp(path.join(from, "ritual"), path.join(to, "ritual"), { recursive: true }).catch(() => console.log("(no ritual/ in out/db: run build-rituals.mjs)"));
 await cp(path.join(from, "trap"), path.join(to, "trap"), { recursive: true }).catch(() => console.log("(no trap/ in out/db: run build-traps.mjs)"));
+await cp(path.join(from, "glossary"), path.join(to, "glossary"), { recursive: true }).catch(() => console.log("(no glossary/ in out/db: run build-glossary.mjs)"));
 await cp(path.join(from, "manifest.json"), path.join(to, "manifest.json"));
 
 const manifest = JSON.parse(await readFile(path.join(to, "manifest.json"), "utf8"));
-console.log(`Published ${manifest.powers} powers (${manifest.items} items, ${manifest.files} files)${manifest.races ? `, ${manifest.races.count} races` : ""}${manifest.classes ? `, ${manifest.classes.count} classes` : ""}${manifest.monsters ? `, ${manifest.monsters.count} monsters` : ""}${manifest.gear ? `, ${manifest.gear.count} gear` : ""}${manifest.magic ? `, ${manifest.magic.count} magic items` : ""}${manifest.rituals ? `, ${manifest.rituals.count} rituals` : ""}${manifest.traps ? `, ${manifest.traps.count} traps` : ""}${manifest.options ? `, ${Object.entries(manifest.options).map(([k, v]) => `${v.count} ${k}`).join(", ")}` : ""} to ${to}`);
+console.log(`Published ${manifest.powers} powers (${manifest.items} items, ${manifest.files} files)${manifest.races ? `, ${manifest.races.count} races` : ""}${manifest.classes ? `, ${manifest.classes.count} classes` : ""}${manifest.monsters ? `, ${manifest.monsters.count} monsters` : ""}${manifest.gear ? `, ${manifest.gear.count} gear` : ""}${manifest.magic ? `, ${manifest.magic.count} magic items` : ""}${manifest.rituals ? `, ${manifest.rituals.count} rituals` : ""}${manifest.traps ? `, ${manifest.traps.count} traps` : ""}${manifest.glossary ? `, ${manifest.glossary.count} glossary entries` : ""}${manifest.options ? `, ${Object.entries(manifest.options).map(([k, v]) => `${v.count} ${k}`).join(", ")}` : ""} to ${to}`);
 console.log("In Foundry: the importer reads the folder named in its 'Database folder' setting (default: dnd4e-db).");
