@@ -150,6 +150,18 @@ Powers, features, equipment and magic items, consumables, loot and rituals get o
 
 The icons are used by their path (`icons/magic/fire/...`), never copied: they are Foundry's, to be used inside Foundry. The paths to pick from are in `icons-catalog.json`, made from a Foundry install by `npm run icons:catalog`.
 
+## Tokens
+
+Monsters, traps and companions can take the token of the 5etools image repository (`bestiary/tokens/<book>/<name>.webp` of `5etools-mirror-3/5etools-img`), as both portrait and token image. 4e has its own monsters, so besides the same name a monster takes the token of the creature its name begins or ends with ("Goblin Cutter" the Goblin, "Tainted Zombie" the Zombie), or one with Young, Adult... before the name ("Elder White Dragon" the Young White Dragon). A role or a kind alone (Giant, Dragon, Warrior) is not a creature, and what follows "of" is a name: "Giant Ant" and "Adept of Orcus" get none. The core books are preferred when several have the name. About a third of the monsters get a token this way; the rest keep the default.
+
+```
+npm run tokens:list    # the list of tokens in the repository (3 calls to the GitHub API), saved in out/tokens/list.json
+npm run pipeline       # (or npm run tokens:apply) sets the actors' portrait and token image to dnd4e-tokens/<book>/<name>.webp
+npm run tokens         # downloads the matched tokens (about 550 files, 100 MB) to G:/Foundry/FoundryVTT/Data/dnd4e-tokens
+```
+
+The images are art of the books and are not part of this project: they are downloaded to your Foundry data folder (`--to <dir>` or `DND4E_TOKENS_TO` for another one, and then the path in the actors has to match), never to a repository. Without the list, `apply-tokens.mjs` changes nothing; an actor whose file is not downloaded shows a missing image.
+
 ## Tests
 
 `npm test` runs without Foundry:
