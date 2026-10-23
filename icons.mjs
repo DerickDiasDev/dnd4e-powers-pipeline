@@ -122,7 +122,7 @@ const POOLS = {
 	ritual: pool(["sundries/scrolls", "sundries/books"]),
 	// the natural attacks of creatures
 	claws: pool("creatures/claws"),
-	bites: pool(["creatures/mammals", "creatures/reptiles", "creatures/unholy", "creatures/invertebrates"], /bite|fang|teeth|tooth|jaw|maw|snake|fangs/),
+	bites: pool(["creatures/abilities", "creatures/reptiles"], /fang|bite|mouth-teeth-(?!human|crooked)|snake-fangs/),
 	slams: pool(["creatures/claws", "creatures/tentacles", "skills/melee"], /hammer|slam|punch|fist|tentacle|claw|club|strike-club|horn|tail/),
 };
 
