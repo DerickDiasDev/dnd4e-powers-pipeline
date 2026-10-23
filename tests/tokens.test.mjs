@@ -5,7 +5,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { indexTokens, localPath, matchToken, nameVariants, normalize } from "../tokens.mjs";
-import { setToken } from "../apply-tokens.mjs";
+import { clearIcon, setToken } from "../apply-tokens.mjs";
 
 const index = indexTokens([
 	"MM/Goblin.webp", "VGM/Goblin.webp", "MM/Young White Dragon.webp", "MM/Owlbear.webp", "MM/Lich.webp", "PSK/Dragon.webp",
@@ -55,5 +55,16 @@ describe("the files", () => {
 		setToken(actor, "MM/Goblin.webp");
 		assert.equal(actor.img, "dnd4e-tokens/MM/goblin.webp");
 		assert.deepEqual(actor.prototypeToken, { name: "Goblin Cutter", width: 1, texture: { src: "dnd4e-tokens/MM/goblin.webp" } });
+	});
+	test("an image an earlier run gave an actor (an icon, or a token no longer picked) is taken away; any other is kept", () => {
+		const icon = { name: "Fire Drake", img: "icons/creatures/reptiles/dragon-winged-blue.webp", prototypeToken: { name: "Fire Drake", texture: { src: "icons/creatures/reptiles/dragon-winged-blue.webp" } } };
+		assert.equal(clearIcon(icon), true);
+		assert.deepEqual(icon, { name: "Fire Drake", prototypeToken: { name: "Fire Drake" } });
+		const token = { name: "Goblin", img: "dnd4e-tokens/MM/goblin.webp", prototypeToken: { texture: { src: "dnd4e-tokens/MM/goblin.webp" } } };
+		assert.equal(clearIcon(token), true);
+		assert.deepEqual(token, { name: "Goblin", prototypeToken: {} });
+		const own = { name: "Mine", img: "worlds/mine/portrait.webp" };
+		assert.equal(clearIcon(own), false);
+		assert.equal(own.img, "worlds/mine/portrait.webp");
 	});
 });
