@@ -3,6 +3,9 @@
  * the actor's portrait and its token image become `dnd4e-tokens/<book>/<name>.webp`, a path under the Foundry data folder where
  * fetch-tokens.mjs downloads the files. An actor with no matching token is left as it is.
  *
+ * A monster (not a trap) with no token gets, for now, Foundry's art for the kind of creature it is (icons.mjs, iconForActor), as portrait and
+ * token image: an icon, not a token, and many monsters share the same ones.
+ *
  * It needs the list of tokens (node fetch-tokens.mjs --list); without it nothing is changed. With the bestiary files (--bestiary) a monster
  * takes the token of the most like creature of its family; without them, the one its name gives. Running it again changes nothing.
  *
@@ -13,6 +16,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { indexTokens, localPath, matchToken } from "./tokens.mjs";
 import { candidatesFrom, matchFamily } from "./token-family.mjs";
+import { iconForActor } from "./icons.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const db = path.join(root, "out", "db");
@@ -59,30 +63,33 @@ export async function matchesIn(tokenFiles) {
 	return (await actorFiles()).flatMap(({ data }) => actorsOf(data)).map(a => ({ name: a.name, ...match(a) })).filter(m => m.file);
 }
 
-/** Sets the portrait and the token image of an actor to the downloaded token. */
-export function setToken(actor, file) {
-	const src = `${TOKEN_FOLDER}/${localPath(file)}`;
+/** Sets the portrait and the token image of an actor to an image (a path under the Foundry data folder). */
+export function setImage(actor, src) {
 	actor.img = src;
 	actor.prototypeToken = { ...actor.prototypeToken, texture: { ...actor.prototypeToken?.texture, src } };
+}
+
+/** Sets the portrait and the token image of an actor to the downloaded token. */
+export function setToken(actor, file) {
+	setImage(actor, `${TOKEN_FOLDER}/${localPath(file)}`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	let list;
 	try { list = JSON.parse(await readFile(path.join(root, "out", "tokens", "list.json"), "utf8")); } catch { console.log("No list of tokens (node fetch-tokens.mjs --list): no token was set."); process.exit(0); }
 	const match = await tokenMatcher(list);
-	const how = { exact: 0, family: 0, edge: 0, modifier: 0 };
+	const how = { exact: 0, family: 0, edge: 0, modifier: 0, icon: 0 };
 	let total = 0;
 	for (const { file, data } of await actorFiles()) {
 		let changed = false;
 		for (const actor of actorsOf(data)) {
 			total++;
 			const found = match(actor);
-			if (!found) continue;
-			setToken(actor, found.file);
-			how[found.how]++;
-			changed = true;
+			if (found) { setToken(actor, found.file); how[found.how]++; changed = true; continue; }
+			const icon = iconForActor(actor);
+			if (icon) { setImage(actor, icon); how.icon++; changed = true; }
 		}
 		if (changed) await writeFile(file, JSON.stringify(data));
 	}
-	console.log(`${how.exact + how.family + how.edge + how.modifier} of ${total} actors have a token (${how.exact} by the name, ${how.family} by the most like creature of the family, ${how.edge} by the creature the name begins or ends with, ${how.modifier} with Young, Adult...)`);
+	console.log(`${how.exact + how.family + how.edge + how.modifier} of ${total} actors have a token (${how.exact} by the name, ${how.family} by the most like creature of the family, ${how.edge} by the creature the name begins or ends with, ${how.modifier} with Young, Adult...); ${how.icon} more have Foundry's art for their kind of creature`);
 }

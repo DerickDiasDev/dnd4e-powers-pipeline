@@ -120,9 +120,43 @@ const POOLS = {
 	gear: pool(["containers/bags", "tools/hand", "sundries/survival"]),
 	wondrous: pool(["commodities/gems", "sundries/misc"]),
 	ritual: pool(["sundries/scrolls", "sundries/books"]),
+	// breaths
+	breathFire: pool("creatures/abilities", /^dragon-fire-breath/),
+	breathCold: pool("creatures/abilities", /^dragon-ice-breath/),
+	breath: pool("creatures/abilities", /^dragon-breath/),
 	// the natural attacks of creatures
 	claws: pool("creatures/claws"),
 	bites: pool(["creatures/abilities", "creatures/reptiles"], /fang|bite|mouth-teeth-(?!human|crooked)|snake-fangs/),
+	// creatures: the art Foundry has for them, a provisional token for a monster that has none
+	cDragon: pool("creatures/reptiles", /dragon/),
+	cSnake: pool("creatures/reptiles", /snake|serpent/),
+	cLizard: pool("creatures/reptiles", /lizard|chameleon|turtle/),
+	cSpider: pool(["creatures/invertebrates", "creatures/webs"], /spider|web/),
+	cInsect: pool("creatures/invertebrates", /^(?!spider)/),
+	cWolf: pool("creatures/mammals", /wolf|dog|cat|fox/),
+	cBat: pool("creatures/mammals", /bat/),
+	cRat: pool("creatures/mammals", /rodent|rat/),
+	cBeast: pool("creatures/mammals", /^(?!bat|rodent|humanoid)/),
+	cBird: pool("creatures/birds"),
+	cFish: pool("creatures/fish"),
+	cFrog: pool("creatures/amphibians"),
+	cSlime: pool("creatures/slimes"),
+	cEye: pool("creatures/eyes", /^(?!human)/),
+	cTentacle: pool("creatures/tentacles"),
+	cDemon: pool("creatures/unholy"),
+	cGhost: pool("creatures/magical", /undead|ghost|spirit-fear/),
+	cBones: pool("magic/death", /bones|skull|zombie|undead|corrupt/),
+	cConstruct: pool("creatures/magical", /construct/),
+	cFireSpirit: pool("creatures/magical", /spirit-(fire|mischief-fire-blue)/),
+	cIceSpirit: pool("creatures/magical", /spirit-mischief-fire-ice/),
+	cEarthSpirit: pool("creatures/magical", /spirit-earth/),
+	cSpirit: pool("creatures/magical", /spirit-(?!undead)/),
+	cFey: pool("creatures/magical", /fae/),
+	cGiant: pool("creatures/magical", /humanoid-(giant|horned)/),
+	cHumanoid: pool("environment/people", /infantry|spearfighter|commoner|group/),
+	cArcher: pool("environment/people", /archer/),
+	cCleric: pool("environment/people", /cleric/),
+	cHoly: pool("magic/holy"),
 	slams: pool(["creatures/claws", "creatures/tentacles", "skills/melee"], /hammer|slam|punch|fist|tentacle|claw|club|strike-club|horn|tail/),
 };
 
@@ -139,6 +173,7 @@ export function powerKind(item) {
 	// A power named for a weapon ("Shortbow", "Javelin", "Spear Charge") takes the weapon's own art; "Dagger of Flame" is a magic one.
 	const weapon = naturalWeapon(item.name) ?? weaponNamed(item.name);
 	if (weapon) return weapon;
+	if (/^breath\b/i.test(item.name ?? "")) return breathKind(s);
 	for (const type of DAMAGE_ORDER) if (s.damageType?.[type]) return type;
 	if (s.weaponType === "melee" || s.weaponType === "meleeRanged") return "melee";
 	if (s.weaponType === "ranged") return "ranged";
@@ -201,6 +236,17 @@ export function weaponNamed(name) {
 	const start = String(name ?? "").replace(/["'‘’“”]/g, "").split(/\s+/).slice(0, 2).join(" ");
 	for (const [re, kind] of WEAPON_WORDS) if (re.test(start) && kind !== "ammo") return kind;
 	return null;
+}
+
+/**
+ * The kind of icon for a breath weapon: Foundry has dragon breaths of fire and of ice; the other elements use the art of the element,
+ * and a breath with no element (or no damage) the plain dragon breath.
+ */
+export function breathKind(system) {
+	const element = DAMAGE_ORDER.find(type => system?.damageType?.[type]);
+	if (element === "fire") return "breathFire";
+	if (element === "cold") return "breathCold";
+	return element ?? "breath";
 }
 
 /** The natural attack a power's name begins with (a claw, a bite, a slam), or null: creatures have art for them. */
@@ -304,4 +350,62 @@ export function decorate(data, ctx = {}) {
 		: ctx;
 	for (const [key, value] of Object.entries(data)) if (value && typeof value === "object" && key !== "system" && key !== "flags" && key !== "effects") count += decorate(value, here);
 	return count;
+}
+
+/**
+ * What a monster's name says it is, for the art of creatures: the first kind with a word the name has (a whole word, plural or not),
+ * else its origin and type. The order matters: a "fire drake" is a dragon, a "fire mephit" a fire spirit.
+ */
+const CREATURE_WORDS = Object.entries({
+	cDragon: "dragon drake wyrm wyvern wyrmling dracolich",
+	cSnake: "snake serpent naga viper cobra basilisk asp",
+	cLizard: "lizard saurian crocodile alligator iguana chameleon troglodyte gecko skink lizardfolk",
+	cSpider: "spider drider tarantula arachnid",
+	cInsect: "scorpion centipede ant beetle wasp bee fly insect kruthik mosquito locust worm larva tick leech",
+	cWolf: "wolf wolves worg warg dog hound jackal cat panther lion tiger leopard fox",
+	cBat: "bat",
+	cRat: "rat rodent ratkin wererat",
+	cBeast: "bear boar bull ox horse steed elk deer stag goat ram bison rhinoceros elephant camel mammoth ape gorilla owlbear hippogriff griffon lynx badger hyena nightmare destrier mekillot",
+	cBird: "bird eagle hawk raven crow owl roc harpy vulture stirge falcon hen swan duck",
+	cFish: "fish shark eel squid kraken octopus crab merfolk sahuagin piranha marlin whale",
+	cFrog: "frog toad newt",
+	cSlime: "ooze slime jelly pudding cube blob",
+	cEye: "beholder gazer eye watcher",
+	cTentacle: "mind flayer illithid tentacle aboleth neothelid",
+	cDemon: "demon devil imp fiend succubus incubus balor cambion abyssal infernal hellhound quasit rakshasa yochlol barbazu osyluth bulezau nabassu",
+	cBones: "skeleton zombie ghoul mummy bones corpse revenant skull",
+	cGhost: "ghost wraith specter spectre banshee wight shade phantom lich vampire haunt apparition",
+	cConstruct: "golem construct animated gargoyle statue automaton warforged magen scarecrow armor dummy",
+	cFireSpirit: "fire flame magma lava ember salamander efreeti azer burning inferno cinder smoke",
+	cIceSpirit: "ice frost cold winter snow glacier blizzard chill",
+	cEarthSpirit: "earth stone rock crystal gem mud sand dust xorn galeb",
+	cSpirit: "elemental genie djinn air wind storm water lightning thunder tempest wisp spark spirit primordial mephit",
+	cFey: "fey fairy pixie sprite dryad eladrin satyr treant nymph hag brownie sylph spriggan boggle redcap quickling korred",
+	cGiant: "giant ogre troll ettin cyclops titan fomorian oni minotaur jotun colossus",
+	cHoly: "angel deva archon celestial solar planetar couatl seraph",
+}).map(([kind, list]) => [new RegExp(`\\b(?:${list.split(" ").join("|")})(?:s|es)?\\b`), kind]);
+const ORIGIN_KIND = { elemental: "cSpirit", shadow: "cGhost", fey: "cFey", aberrant: "cEye", immortal: "cHoly" };
+
+/** The kind of creature art for a monster (a key of POOLS). */
+export function creatureKind(actor) {
+	const name = String(actor?.name ?? "").toLowerCase();
+	for (const [re, kind] of CREATURE_WORDS) if (re.test(name)) return kind;
+	const d = actor?.system?.details ?? {};
+	if (/undead/.test(String(d.other ?? "").toLowerCase())) return "cGhost";
+	if (ORIGIN_KIND[d.origin]) return ORIGIN_KIND[d.origin];
+	if (d.type === "beast") return "cBeast";
+	if (d.type === "animate") return "cConstruct";
+	const role = actor?.system?.details?.role ?? {};
+	if (role.primary === "artillery") return "cArcher";
+	if (role.leader || role.primary === "controller") return "cCleric";
+	return "cHumanoid";
+}
+
+/**
+ * A provisional portrait and token image for a monster that has no token of 5etools: Foundry's art for the kind of creature it is.
+ * It is an icon, not a token; many monsters share the same ones. Traps (Hazard) are given none.
+ */
+export function iconForActor(actor) {
+	if (actor?.type !== "NPC") return null;
+	return pick(POOLS[creatureKind(actor)], actor.name);
 }

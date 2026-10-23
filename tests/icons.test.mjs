@@ -172,3 +172,36 @@ describe("powers named for a weapon or a natural attack", () => {
 		assert.match(iconForItem(power({}, "Claw")), /^icons\/creatures\/claws\//);
 	});
 });
+
+describe("breath weapons", () => {
+	test("fire and cold have Foundry's dragon breaths, the other elements their own art, none the plain breath", async () => {
+		const { breathKind } = await import("../icons.mjs");
+		assert.deepEqual([{ fire: true }, { cold: true }, { acid: true }, { lightning: true }, {}].map(damageType => breathKind({ damageType })), ["breathFire", "breathCold", "acid", "lightning", "breath"]);
+		assert.match(iconForItem(power({ damageType: { fire: true } }, "Breath Weapon")), /dragon-fire-breath/);
+		assert.match(iconForItem(power({ damageType: { cold: true } }, "Breath Weapon")), /dragon-ice-breath/);
+		assert.match(iconForItem(power({ damageType: { acid: true } }, "Breath Weapon")), /^icons\/magic\/acid\//);
+		assert.match(iconForItem(power({}, "Breath of the Grave")), /dragon-breath/);
+		assert.doesNotMatch(iconForItem(power({}, "Breathe Mosquitoes")), /dragon-breath/);
+	});
+});
+
+describe("art for monsters with no token", () => {
+	const monster = (name, details = {}, type = "NPC") => ({ _id: "m", name, type, system: { details: { role: {}, ...details } } });
+	test("by a whole word of the name, then by origin and type", async () => {
+		const { creatureKind } = await import("../icons.mjs");
+		assert.deepEqual(["Fire Drake", "Air Mephit", "Fire Mephit", "Giant Ant", "Dire Wolves", "Bone Crown Behemoth", "Misfortune Devil", "Mind Flayer Scourge"].map(name => creatureKind(monster(name))),
+			["cDragon", "cSpirit", "cFireSpirit", "cInsect", "cWolf", "cHumanoid", "cDemon", "cTentacle"]);
+		assert.equal(creatureKind(monster("Crowned Thing")), "cHumanoid");
+		assert.equal(creatureKind(monster("Thing", { origin: "fey" })), "cFey");
+		assert.equal(creatureKind(monster("Thing", { type: "beast" })), "cBeast");
+		assert.equal(creatureKind(monster("Thing", { type: "animate" })), "cConstruct");
+		assert.equal(creatureKind(monster("Thing", { role: { primary: "artillery" } })), "cArcher");
+		assert.equal(creatureKind(monster("Thing", { other: "undead" })), "cGhost");
+	});
+	test("a monster gets an icon of Foundry's creatures, a trap none", async () => {
+		const { iconForActor } = await import("../icons.mjs");
+		const icon = iconForActor(monster("Fire Drake"));
+		assert.ok(ICON_CATALOG.has(icon) && icon.startsWith("icons/creatures/reptiles/"));
+		assert.equal(iconForActor(monster("False-Floor Pit", {}, "Hazard")), null);
+	});
+});
