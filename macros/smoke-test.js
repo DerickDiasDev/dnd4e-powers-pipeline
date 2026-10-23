@@ -21,6 +21,7 @@
  *   H. extras     a deity writes its name into the sheet; diseases and companions, poisons, traps (NPCs with printed numbers) and glossary entries
  *                 (journal entries) are accepted by the model
  *   I. item powers the powers of a magic item are power items with the numbers of the level it is imported at (the equip/copy flow needs a world: see the README)
+ *   M. builder    the character builder: a build's scores, racial bonus, trained skills and class numbers on a sheet; a power for every slot of a level
  *   L. companions a companion creature is an NPC with its master's numbers (hit points, defences, attack, damage) or a level
  *   K. consumables a consumable is its own power: it takes the attack and damage of the level it is imported at
  *   J. armour base a magic armour that names several kinds takes the bonus, penalties and kind of the armour or shield it is based on
@@ -510,6 +511,33 @@ await run("L companions", "a companion is an NPC with its master's numbers: hit 
 	const only = companionModule.applyCompanion(clone(template), null, 10);
 	eq("L companions", "with only a level: 1 hit point and a note that the sheet was missing", [only.system.attributes.hp.max, only.flags.dnd4e.import.review.includes("no-master-sheet")], [1, true]);
 	record("L companions", "the model accepts the companion made with only a level", make(only).items.size >= 1, make(only).items.size, "its power and trait items");
+});
+
+/* ======================================================= M. the character builder */
+const builderModule = await import(`/modules/${MODULE_ID}/scripts/builder.mjs`);
+const builderApply = await import(`/modules/${MODULE_ID}/scripts/builder-apply.mjs`);
+await run("M builder", "a first-level human knight: the scores, the racial bonus and the class's numbers on the sheet", async () => {
+	const raceRow = (await get("race/_index.json")).find(r => r.name === "Human");
+	const raceEntry = (await get("race/races.json")).find(e => e._id === raceRow._id);
+	const classRow = (await get("class/_index.json")).find(r => r.name === "Fighter (Knight)");
+	const classEntry = (await get("class/classes.json")).find(e => e._id === classRow._id);
+	const draft = { ...builderModule.newDraft(1), race: raceRow.id, raceAbility: "str", class: classRow.id, base: { str: 16, con: 14, dex: 11, int: 8, wis: 12, cha: 8 }, skills: ["ath", "end", "hea"] };
+	eq("M builder", "the point buy of 22 points allows these scores (10 + 6 + 3 + 0 + 4 + 0 = 23 is too many; with Dex 10 it is 22)", [builderModule.pointCost(draft.base), builderModule.validBase(draft.base, "pointbuy")], [23, false]);
+	draft.base.dex = 10;
+	eq("M builder", "with Dex 10 it is exactly 22 points", [builderModule.pointCost(draft.base), builderModule.validBase(draft.base, "pointbuy")], [22, true]);
+	const update = builderApply.sheetUpdate(draft, raceEntry);
+	const plain = make(pc());
+	const built = patched(pc(), { ...update, ...classModule.classPatch(make(pc({ abilities: { con: { value: 14 } } })).system, classEntry.apply).update });
+	eq("M builder", "the human's bonus goes to Strength: 16 + 2 = 18", [built.system.abilities.str.value, built.system.abilities.str.mod], [18, 4]);
+	eq("M builder", "the trained skills are on the sheet", ["ath", "end", "hea"].map(k => built.system.skills[k].training), [5, 5, 5]);
+	eq("M builder", "the knight's hit points: 15 + Constitution 14 = 29, and the class's primary ability", [built.system.attributes.hp.max, built.system.details.primaryAbility], [29, "str"]);
+	record("M builder", "the same character without the build has none of it", plain.system.abilities.str.value === 10 && plain.system.attributes.hp.max !== 29, [plain.system.abilities.str.value, plain.system.attributes.hp.max], "10 and not 29");
+});
+
+await run("M builder", "a first-level fighter has powers to choose for every slot, and a wizard too at level 10", async () => {
+	const powers = await get("power/_index.json");
+	for (const slot of builderModule.powerSlots(1)) record("M builder", `fighter slot ${slot.key}: ${builderModule.slotCandidates(powers, "Fighter", slot).length} candidates`, builderModule.slotCandidates(powers, "Fighter", slot).length >= 5, builderModule.slotCandidates(powers, "Fighter", slot).length, ">= 5");
+	for (const slot of builderModule.powerSlots(10)) record("M builder", `wizard slot ${slot.key}`, builderModule.slotCandidates(powers, "Wizard", slot).length >= 1, builderModule.slotCandidates(powers, "Wizard", slot).length, ">= 1");
 });
 
 /* ======================================================= report */
