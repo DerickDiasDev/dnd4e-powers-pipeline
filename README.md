@@ -152,12 +152,13 @@ The icons are used by their path (`icons/magic/fire/...`), never copied: they ar
 
 ## Tokens
 
-Monsters, traps and companions can take the token of the 5etools image repository (`bestiary/tokens/<book>/<name>.webp` of `5etools-mirror-3/5etools-img`), as both portrait and token image. 4e has its own monsters, so besides the same name a monster takes the token of the creature its name begins or ends with ("Goblin Cutter" the Goblin, "Tainted Zombie" the Zombie), or one with Young, Adult... before the name ("Elder White Dragon" the Young White Dragon). A role or a kind alone (Giant, Dragon, Warrior) is not a creature, and what follows "of" is a name: "Giant Ant" and "Adept of Orcus" get none. The core books are preferred when several have the name. About a third of the monsters get a token this way; the rest keep the default.
+Monsters, traps and companions can take the token of the 5etools image repository (`bestiary/tokens/<book>/<name>.webp` of `5etools-mirror-3/5etools-img`), as both portrait and token image. The same creature has other names in 4e and 5e (a goblin mage is a Booyahg Caster), so the match is made in a family (`token-family.mjs`): the creatures of 5etools whose name has the monster's creature word ("Goblin Hexer" -> goblin), or whose type tag begins with a word the name begins with ("goblin" -> goblinoid). The same name comes first; otherwise the creature most like the monster wins: a caster for a caster (a controller, or a name like Mage, Shaman, Hexer), an archer for an artillery, a boss for a leader, then the nearest in level (the challenge rating of 5e against the level of 4e) and in size, so an Elder White Dragon takes the Young, Adult or Ancient one by its level. A role, a size, an element or a colour alone (Giant, Fire, Warrior) is not a creature, a name that ends with a role is not looked up by it, and what follows "of" is a name: "Giant Sea Snake", "Fire Drake" and "Adept of Orcus" get none. Without the bestiary files the match is by the name alone (the creature the name begins or ends with). About 40% of the monsters get a token this way; the rest keep the default.
 
 ```
-npm run tokens:list    # the list of tokens in the repository (3 calls to the GitHub API), saved in out/tokens/list.json
-npm run pipeline       # (or npm run tokens:apply) sets the actors' portrait and token image to dnd4e-tokens/<book>/<name>.webp
-npm run tokens         # downloads the matched tokens (about 550 files, 100 MB) to G:/Foundry/FoundryVTT/Data/dnd4e-tokens
+npm run tokens:list      # the list of tokens in the repository (3 calls to the GitHub API), saved in out/tokens/list.json
+node fetch-tokens.mjs --bestiary   # the 5etools bestiary files of those books (110 files, 12 MB), saved in out/tokens/bestiary/
+npm run pipeline         # (or npm run tokens:apply) sets the actors' portrait and token image to dnd4e-tokens/<book>/<name>.webp
+npm run tokens           # downloads the matched tokens (about 600 files, 100 MB) to G:/Foundry/FoundryVTT/Data/dnd4e-tokens
 ```
 
 The images are art of the books and are not part of this project: they are downloaded to your Foundry data folder (`--to <dir>` or `DND4E_TOKENS_TO` for another one, and then the path in the actors has to match), never to a repository. Without the list, `apply-tokens.mjs` changes nothing; an actor whose file is not downloaded shows a missing image.

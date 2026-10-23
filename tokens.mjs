@@ -8,7 +8,7 @@
  */
 
 /** Words that name a role or a trade, not a creature: alone, they are not enough to take a token. */
-const GENERIC = new Set([
+export const GENERIC = new Set([
 	"warrior", "guard", "soldier", "archer", "mage", "priest", "scout", "brute", "hunter", "knight", "assassin", "thug", "cultist", "acolyte",
 	"fighter", "wizard", "sorcerer", "rogue", "ranger", "cleric", "captain", "chief", "boss", "leader", "champion", "lord", "king", "queen",
 	"elder", "ancient", "young", "adult", "greater", "lesser", "minion", "elite", "solo", "swarm", "spirit", "servant", "guardian", "stalker",
@@ -19,11 +19,11 @@ const GENERIC = new Set([
 /** Words that make what follows a name ("Adept of Orcus"). */
 const LINKS = new Set(["of", "the", "in", "from"]);
 /** Modifiers 5etools puts before a creature's name. */
-const MODIFIERS = ["young", "adult", "ancient", "elder", "greater", "lesser", "giant", "dire", "wild"];
+export const MODIFIERS = ["young", "adult", "ancient", "elder", "greater", "lesser", "giant", "dire", "wild"];
 /** Books to prefer when several have a token of the name: the core ones first. */
-const BOOK_ORDER = ["MM", "MPMM", "XMM", "VGM", "MTF", "FTD", "MToF", "VRGR"];
+export const BOOK_ORDER = ["MM", "MPMM", "XMM", "VGM", "MTF", "FTD", "MToF", "VRGR"];
 
-const words = text => String(text).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
+export const words = text => String(text).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
 	.map(w => (w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w));
 export const normalize = text => words(text).join(" ");
 

@@ -7,6 +7,8 @@
  * to a repository. Only the tokens a monster is matched to (see tokens.mjs) are downloaded, and the ones already there are kept.
  *
  *   node fetch-tokens.mjs --list      the list of tokens in the repository (3 calls to the GitHub API), saved in out/tokens/list.json
+ *   node fetch-tokens.mjs --bestiary  the 5etools bestiary files of the books that have tokens (about 110 files, 12 MB), saved in out/tokens/bestiary/:
+ *                                     the types, sizes and challenge ratings that let a monster take the token of the most like creature of its family
  *   node fetch-tokens.mjs             download the matched tokens (needs the list and the built database: npm run pipeline)
  *   node fetch-tokens.mjs --to <dir>  another folder (or set DND4E_TOKENS_TO)
  */
@@ -37,6 +39,25 @@ if (argv.includes("--list")) {
 	await mkdir(path.dirname(listFile), { recursive: true });
 	await writeFile(listFile, JSON.stringify(files));
 	console.log(`${files.length} tokens in the repository, list saved to ${listFile}`);
+	process.exit(0);
+}
+
+if (argv.includes("--bestiary")) {
+	const base = "https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/main/data/bestiary";
+	let listed;
+	try { listed = new Set(JSON.parse(await readFile(listFile, "utf8")).map(f => f.split("/")[0])); } catch { console.error("No list of tokens. Run: node fetch-tokens.mjs --list"); process.exit(1); }
+	const index = await (await fetch(`${base}/index.json`)).json();
+	const folder = path.join(root, "out", "tokens", "bestiary");
+	await mkdir(folder, { recursive: true });
+	let saved = 0;
+	for (const [source, file] of Object.entries(index)) {
+		if (!listed.has(source)) continue;
+		const response = await fetch(`${base}/${file}`);
+		if (!response.ok) { console.error(`${source}: HTTP ${response.status}`); continue; }
+		await writeFile(path.join(folder, `${source}.json`), Buffer.from(await response.arrayBuffer()));
+		saved++;
+	}
+	console.log(`${saved} bestiary files saved to ${folder}`);
 	process.exit(0);
 }
 
