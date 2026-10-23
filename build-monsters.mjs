@@ -119,10 +119,15 @@ export function selfify(text, name) {
 function effectSection(lines) {
 	const of = labels => lines.filter(l => labels.test(l.label)).map(l => l.text).join("\n");
 	const make = text => ({ text, ...analyze(text) });
-	const attackLine = lines.find(l => !l.label)?.text ?? "";
+	// "Make an attack: Ranged 5/10; +4 vs. Reflex; on a hit, ..." (a consumable's) is the attack line of the old layout, with a label.
+	const plain = lines.filter(l => !l.label || /^make an attack$/i.test(l.label)).map(l => l.text);
+	const attackLine = plain[0] ?? "";
+	const isAttackLine = /\bvs\.?\s+(?:AC|Fortitude|Reflex|Will)\b/i.test(attackLine);
 	// The old layout puts attack and hit in one line: "+6 vs AC; 1d8 damage, and the target is dazed (save ends)."
 	const hit = of(/^hit$/i) || attackLine.split(/vs\.?\s+(?:AC|Fortitude|Reflex|Will)\s*;?/i)[1] || "";
-	return { hit: make(hit), miss: make(of(/^miss$/i)), effect: make(of(/^effect$/i) || (lines.some(l => /^hit$/i.test(l.label)) || attackLine ? "" : attackLine)) };
+	// A power with no Effect line whose text is not an attack ("The target takes ongoing 5 cold damage (save ends).") has it all as its effect.
+	const effect = of(/^effect$/i) || (lines.some(l => /^hit$/i.test(l.label)) ? "" : isAttackLine ? plain.slice(1).join("\n") : plain.join("\n"));
+	return { hit: make(hit), miss: make(of(/^miss$/i)), effect: make(effect) };
 }
 
 export function convertPowerItem(m, p, index) {

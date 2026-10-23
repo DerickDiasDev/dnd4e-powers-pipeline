@@ -280,7 +280,8 @@ const TYPES_PART = `(?:(?:${TYPE_RE})(?:\\s*,\\s*(?:and\\s+|or\\s+)?|\\s+(?:and|
 // After a "+", a bare ability name counts as a modifier too ("5[W] + Strength damage", "+ Strength, Dexterity, or Constitution damage").
 const BARE_ABILITY = `(?:${ABIL_RE})(?:\\s*,\\s*(?:or\\s+)?(?:${ABIL_RE})|\\s+or\\s+(?:${ABIL_RE}))*`;
 const DAMAGE_RE = new RegExp(`(?<![\\w\\[])(${TERM}(?:\\s*\\+\\s*(?:${TERM}|${BARE_ABILITY}))*)\\s+((?:(?:extra|additional)\\s+)?${TYPES_PART})damage`, "gi");
-const ONGOING_RE = new RegExp(`ongoing\\s+(\\d+)\\s+((?:(?:${TYPE_RE})(?:\\s*,\\s*(?:and\\s+|or\\s+)?|\\s+(?:and|or)\\s+|\\s+))*)damage(?:\\s*\\(([^)]*)\\))?`, "gi");
+// "ongoing 5 fire damage (save ends)", and the older "5 ongoing fire damage".
+const ONGOING_RE = new RegExp(`(?:ongoing\\s+(\\d+)|(\\d+)\\s+ongoing)\\s+((?:(?:${TYPE_RE})(?:\\s*,\\s*(?:and\\s+|or\\s+)?|\\s+(?:and|or)\\s+|\\s+))*)damage(?:\\s*\\(([^)]*)\\))?`, "gi");
 
 // "resist 10 to all damage", "vulnerable 5 to all damage", "resistance to all damage equal to one-half your level + your Constitution modifier"
 const RESIST_RE = new RegExp(`\\b(resist(?:ance)?|vulnerab(?:le|ility))\\s+(?:(\\d+)\\s+)?(?:to\\s+)?(all\\s+damage|(?:the\\s+chosen|that|each|every)\\s+damage\\s+types?|(?:(?:${TYPE_RE})(?:\\s*,\\s*(?:and\\s+|or\\s+)?|\\s+(?:and|or)\\s+|\\s+))+damage)(?:\\s+equal\\s+to\\s+((?:[^.;(\\n]|\\.\\d)+))?`, "gi");
@@ -337,7 +338,7 @@ export function subjectOf(before) {
 export function appliesCondition(sentence) {
 	const s = sentence.replace(/\(save ends[^)]*\)/gi, "");
 	const applies = /\b(?:is|are|becomes?|be|being)\b|\bknock(?:s|ed|ing)?\b|\bmark(?:s|ed)?\b|\bgrabs?\b|\bfalls? prone\b|\bgrants? combat advantage\b/i.test(s);
-	const mentions = /\bconditions?\b|\bends?\s+(?:the|on|for)\b|\bagainst\b|\bremoves?\b|\bno longer\b|\bimmune\b|\bmarked by (?!you\b)|\bany (?:enem|creature|ally|allies)|\b(?:enemies|creatures|allies) that\b|\bthat (?:starts|ends|begins|enters|leaves)\b|\bat the (?:start|end) of (?:each|every)\b|\buntil the \w+ ends\b/i.test(s);
+	const mentions = /\bconditions?\b|\bends?\s+(?:the|on|for|any)\b|\baffecting\b|\bagainst\b|\bremoves?\b|\bno longer\b|\bimmune\b|\bmarked by (?!you\b)|\bany (?:enem|creature|ally|allies)|\b(?:enemies|creatures|allies) that\b|\bthat (?:starts|ends|begins|enters|leaves)\b|\bat the (?:start|end) of (?:each|every)\b|\buntil the \w+ ends\b/i.test(s);
 	return applies && !mentions;
 }
 
@@ -389,7 +390,14 @@ export function analyze(text) {
 		res.damage.push({ expr: m[2], ...parseDamageExpr(m[2]), types: typesOf(m[1]), extra: false, equalTo: true });
 	}
 	for (const m of text.matchAll(ONGOING_RE)) {
-		res.ongoing.push({ amount: Number(m[1]), types: typesOf(m[2]), saveEnds: /save ends/i.test(m[3] ?? ""), subject: subjectOf(sentenceBefore(text, m.index)) });
+		const before = sentenceBefore(text, m.index);
+		let subject = subjectOf(before);
+		// "Ongoing 5 radiant damage (save ends)." and "Deal ongoing 5 acid damage": nobody named, so it is the target's.
+		if (subject === "unknown" && before.trim().length < 25) subject = "target";
+		// "takes ongoing 5 poison damage and is weakened (save ends both)": the save is in the words that follow.
+		const after = text.slice(m.index + m[0].length).split(/[.;\n]/)[0];
+		const saveEnds = /save ends/i.test(m[4] ?? "") || /^[^()]{0,80}\(save (?:ends|at)/i.test(after);
+		res.ongoing.push({ amount: Number(m[1] ?? m[2]), types: typesOf(m[3]), saveEnds, subject });
 	}
 	for (const sentence of text.split(/(?<=[.;])\s+|\n/)) {
 		if (/\b(?:if|while|whenever|unless|instead)\b/i.test(sentence)) continue;

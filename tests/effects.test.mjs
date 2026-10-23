@@ -9,9 +9,10 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { appliesCondition, parsePower, subjectOf } from "../parse-powers.mjs";
+import { analyze, appliesCondition, parsePower, subjectOf } from "../parse-powers.mjs";
+import { convertPowerItem } from "../build-monsters.mjs";
 import { convertPower } from "../build-db.mjs";
-import { durationTypeOf, statusId } from "../build-effects.mjs";
+import { buildEffects, durationTypeOf, statusId } from "../build-effects.mjs";
 import { effectProblems } from "../validate-effects.mjs";
 import { CATEGORIES, FIXTURES, entry } from "./fixtures.mjs";
 
@@ -19,6 +20,34 @@ const power = (name, blocks, o = {}) => entry(`t-fx-${name}`, { name: `Test ${na
 const build = (raw, ctx = {}) => convertPower(parsePower(raw), { categories: CATEGORIES, ...ctx });
 const effectsOf = (blocks, o) => build(power("x", blocks, o))[0].effects;
 const summary = effects => effects.map(e => [e.name, e.statuses, e.system.durationType, e.system.powerEffectType]);
+
+describe("ongoing damage written the other ways", () => {
+	const dots = text => buildEffects({ hit: { text, ...analyze(text) }, miss: { text: "" }, effect: { text: "" } }, { itemId: "x", damageTypes: ["acid", "cold", "fire", "poison", "radiant"] }).effects.map(e => [e.name, e.system.durationType]);
+
+	test("the number before the word, a sentence that starts with it, and an imperative", () => {
+		assert.deepEqual(dots("1d6 damage, and the target takes 5 ongoing fire damage (save ends)."), [["Ongoing 5 fire", "saveEnd"]]);
+		assert.deepEqual(dots("2d8 damage, and 10 ongoing damage (save ends)."), [["Ongoing 10", "saveEnd"]]);
+		assert.deepEqual(dots("Ongoing 5 radiant damage (save ends). Each time the target fails the saving throw, increase the ongoing damage by 5."), [["Ongoing 5 radiant", "saveEnd"]]);
+		assert.deepEqual(dots("Deal ongoing 5 acid damage (save ends)."), [["Ongoing 5 acid", "saveEnd"]]);
+	});
+
+	test("the save at the end of the sentence belongs to the ongoing damage and the condition it is written with", () => {
+		assert.deepEqual(dots("The target takes ongoing 5 poison damage and is weakened (save ends both)."), [["Ongoing 5 poison", "saveEnd"], ["Weakened", "saveEnd"]]);
+	});
+
+	test("a monster's power with no labels and no attack has its text as its effect, so its ongoing damage is built", () => {
+		const m = { id: "monster900", name: "Zorb", level: 5, sourceCode: "TST", traits: [] };
+		const p = { name: "Icy Spikes", keywords: ["Cold"], usage: "atwill", action: "interrupt", icon: null, limit: null, recharge: null, lines: [{ label: "", text: "The target takes ongoing 5 cold damage (save ends)." }], text: "", attack: { range: null, target: null, bonus: null, defence: null, damage: null } };
+		const [fx] = convertPowerItem(m, p, 0).effects;
+		assert.deepEqual([fx.name, fx.system.durationType, fx.system.dots], ["Ongoing 5 cold", "saveEnd", [{ amount: "5", types: ["cold"] }]]);
+		const attack = { ...p, lines: [{ label: "", text: "Melee 1; +9 vs. AC; 1d6 damage, and the target takes ongoing 5 cold damage (save ends)." }], attack: { range: "Melee 1", target: null, bonus: 9, defence: "ac", damage: "1d6" } };
+		assert.equal(convertPowerItem(m, attack, 1).effects.length, 1, "an attack line is not also the effect");
+	});
+
+	test("ending a mark is not marking", () => {
+		assert.equal(appliesCondition("Klaus ends any mark affecting him and shifts 2 squares."), false);
+	});
+});
 
 describe("who a condition lands on", () => {
 	test("the closest of 'you' and a target word wins", () => {

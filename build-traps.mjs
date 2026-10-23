@@ -43,8 +43,10 @@ export function buildTrap(t) {
 	const hp = t.hp ?? 0;
 	const host = { id: t.id, level: t.level ?? 0, name: t.name, sourceCode: t.sourceCode, traits: [] };
 	const items = (t.powers ?? []).map((p, i) => {
+		// "Level + 3 vs. Reflex": the trap's level plus a number.
+		if (p.levelAttack) p = { ...p, attack: { ...p.attack, bonus: (t.level ?? 0) + p.levelAttack.offset, defence: p.levelAttack.def } };
 		const power = convertPowerItem(host, p, i);
-		Object.assign(power.flags.dnd4e.import, { kind: "trap-power", id: t.id, role: "power" });
+		Object.assign(power.flags.dnd4e.import, { kind: "trap-power", id: t.id, role: "power", ...(p.levelAttack ? { attackLevelOffset: p.levelAttack.offset } : {}) });
 		return power;
 	});
 	const review = [...t.notes];

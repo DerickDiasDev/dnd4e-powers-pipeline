@@ -145,6 +145,26 @@ describe("the attacks of a trap are powers on the actor", () => {
 		assert.deepEqual(powers.map(p => [p.name, p.usage, p.keywords, p.attack.bonus, p.attack.range]), [["Silver Fire", "daily", ["radiant"], 11, "Close burst 3"]]);
 	});
 
+	test("titles with keywords or a name, and a typo in a label", () => {
+		const block = ["Standard Action Close burst 2", "Targers All creatures in burst", "Attack: +9 vs. Reflex", "Hit: 1d6 damage."];
+		for (const [title, name, keywords] of [["Attack Poison, Fire", "Zorb", ["Poison", "Fire"]], ["Attack • Zone", "Zorb", ["Zone"]], ["Attack—Claws of the Dead", "Zorb (Claws of the Dead)", []], ["Blue Dragon Head Attack", "Zorb (Blue Dragon Head)", []]]) {
+			const { powers } = extractPowers([title, ...block], "Zorb");
+			assert.deepEqual([powers.length, powers[0]?.name, powers[0]?.keywords, powers[0]?.attack.range, powers[0]?.attack.bonus], [1, name, keywords, "Close burst 2", 9], title);
+		}
+		assert.equal(extractPowers(["Attack Poison is bad", "Prose."], "Zorb").powers.length, 0, "it needs the action line after it");
+	});
+
+	test("a terrain power: its action, then Requirement, Check, Success, Target, Attack and Hit; the attack is the level plus a number", () => {
+		const text = ["Standard Action", "Requirement: You must be adjacent.", "Check: Athletics check to shove the rock.", "Success: The rock rolls.", "Target: Each creature in a close blast 3 from the rock", "Attack: Level + 3 vs. Fortitude", "Hit: 2d10 + one-half level damage, and the target is knocked prone."];
+		const { powers, body } = extractPowers(text, "Boulder");
+		assert.deepEqual([powers.length, body.length, powers[0].action, powers[0].attack.range, powers[0].levelAttack], [1, 0, "standard", "close blast 3", { offset: 3, def: "fort" }]);
+		const t = { id: "terrain910", name: "Boulder", kind: "terrain", level: null, group: "standard", role: "", xp: null, hp: null, initiative: null, defences: null, detection: "", countermeasures: "", body, powers, sourceCode: "TST", notes: [] };
+		const [item] = buildTrap(t).items;
+		assert.deepEqual([item.system.attack.isAttack, item.system.attack.def, item.system.attack.formula, item.flags.dnd4e.import.attackLevelOffset, item.system.requirement], [true, "fort", "3", 3, "You must be adjacent."]);
+		const leveled = buildTrap({ ...t, level: 6 }).items[0];
+		assert.equal(leveled.system.attack.formula, "9", "the trap's level plus 3");
+	});
+
 	test("an Attack title with nothing after it stays in the text", () => {
 		assert.deepEqual(extractPowers(["Attack", "Prose."], "Zorb"), { powers: [], body: ["Attack", "Prose."] });
 	});
