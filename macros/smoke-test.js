@@ -344,7 +344,8 @@ await run("F magic", "every item with effects is accepted by the model and its e
 	const items = [];
 	for (const row of rows) items.push(...magicModule.planMagicImport(await magicEntry(row), row, new Set(), {}).create);
 	const packed = make(pc(), { items });
-	const expected = items.reduce((n, i) => n + i.effects.length, 0);
+	// A consumable's effects are its power's (applied to a target when it is used): only the ones that transfer reach the owner.
+	const expected = items.reduce((n, i) => n + i.effects.filter(e => e.transfer).length, 0);
 	eq("F magic", `${rows.length} items with effects: all their effects are on the actor`, [...packed.allApplicableEffects()].length, expected);
 	eq("F magic", "carried, none of them is active", [...packed.allApplicableEffects()].filter(e => !e.isSuppressed).length, 0);
 });
@@ -374,8 +375,8 @@ await run("H extras", "a deity writes its name into the sheet; a disease and a c
 	const plain = make(pc());
 	const actor = patched(pc(), optionModule.optionPatch(deity.apply));
 	eq("H extras", "avandra: the deity field of the sheet", actor.system.details.deity, "Avandra");
-	const a = make(pc(), { items: [...clone(deity.items), ...clone((await optionEntry("disease", "Echo Madness")).items), ...clone((await optionEntry("companion", "Bear Animal Companion")).items)] });
-	eq("H extras", "three features of the groups Deity, Disease and Animal Companion", a.items.map(i => [i.type, i.system.featureType, i.system.featureGroup]).sort(), [["feature", "other", "Animal Companion"], ["feature", "other", "Deity"], ["feature", "other", "Disease"]]);
+	const a = make(pc(), { items: [...clone(deity.items), ...clone((await optionEntry("disease", "Echo Madness")).items), ...clone((await optionEntry("companion", "Fire Lizard")).items)] });
+	eq("H extras", "three features of the groups Deity, Disease and Familiar (the companion creatures are NPCs: group L)", a.items.map(i => [i.type, i.system.featureType, i.system.featureGroup]).sort(), [["feature", "other", "Deity"], ["feature", "other", "Disease"], ["feature", "other", "Familiar"]]);
 	eq("H extras", "the disease keeps its level", a.items.find(i => i.name === "Echo Madness").system.level, 9);
 	eq("H extras", "a deity changes nothing else on the sheet", [a.system.defences.ac.value, a.system.skills.prc.total], [plain.system.defences.ac.value, plain.system.skills.prc.total]);
 });
@@ -487,7 +488,8 @@ await run("K consumables", "a consumable is its own power: the attack and damage
 	const high = at(11).create[0];
 	eq("K consumables", "at 11: +14 vs. Reflex and 2d10", [high.system.attack.formula, high.system.hit.formula, high.system.level], ["14", "2d10", 11]);
 	eq("K consumables", "it has no power items to create; ranged 5/10, standard action", [at(11).powers.length, high.system.actionType, high.system.rangeType], [0, "standard", "range"]);
-	const a = make(pc(), { items: [first, high] });
+	// Both come from one entry, so they share an _id; in a world each is created with a fresh one.
+	const a = make(pc(), { items: [first, { ...high, _id: foundry.utils.randomID() }] });
 	eq("K consumables", "the model accepts both", a.items.filter(i => i.type === "consumable").length, 2);
 });
 
