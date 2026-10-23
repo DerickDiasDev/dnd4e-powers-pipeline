@@ -113,13 +113,13 @@ describe("decorate", () => {
 		assert.equal(decorate(data), 3);
 		assert.ok(data[0].img && data[1].items[0].img && data[1].powers[0].img);
 	});
-	test("leaves actors, what is inside them, and effects alone", () => {
+	test("leaves the actors and the effects alone, and gives the items inside an actor theirs", () => {
 		const effect = { _id: "fx", name: "Slowed", type: "base", img: "icons/svg/net.svg", system: { changes: [] } };
 		const actor = { _id: "a", name: "Goblin", type: "NPC", system: {}, items: [power()] };
 		const withEffect = { ...power(), effects: [effect] };
-		assert.equal(decorate([actor, withEffect]), 1);
+		assert.equal(decorate([actor, withEffect]), 2);
 		assert.equal(actor.img, undefined);
-		assert.equal(actor.items[0].img, undefined);
+		assert.ok(ICON_CATALOG.has(actor.items[0].img));
 		assert.equal(effect.img, "icons/svg/net.svg");
 	});
 	test("an entry's category and kind reach its items", () => {
@@ -133,5 +133,13 @@ describe("decorate", () => {
 		const first = data[0].img;
 		decorate(data);
 		assert.equal(data[0].img, first);
+	});
+});
+
+describe("traits", () => {
+	test("by a word of the name", async () => {
+		const { traitKind } = await import("../icons.mjs");
+		assert.deepEqual(["Regeneration", "Frost Aura", "Darkvision", "Fire Shroud", "Ambusher"].map(traitKind), ["healing", "cold", "psychic", "fire", "generic"]);
+		assert.ok(ICON_CATALOG.has(iconForItem(feature({ featureType: "trait" }, "Regeneration"))));
 	});
 });

@@ -7,7 +7,7 @@
  * The icons are used by path, not copied: they are Foundry's, to be used inside Foundry (see icons/LICENSE in its install). The
  * list of paths to pick from is icons-catalog.json, made by build-icon-catalog.mjs.
  *
- * Powers, features, equipment, magic items and rituals are given an icon here; actors (monsters, traps, companions) are not.
+ * Powers, features, equipment, magic items and rituals are given an icon here, in actors too; the actors themselves (monsters, traps, companions) are not.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -147,8 +147,21 @@ export function featureKind(item) {
 			if (s.featureGroup === "Disease") return "disease";
 			if (s.featureGroup === "Familiar" || s.featureGroup === "Companion") return "companion";
 			return "generic";
+		case "trait": return traitKind(item.name);
 		default: return "generic";
 	}
+}
+
+/** A trait (mostly a monster's) by a word of its name: auras, regeneration, resistances, senses, flight, the elements. */
+const TRAIT_WORDS = [
+	[/regenerat|heal|life/i, "healing"], [/poison|venom|toxic/i, "poison"], [/fire|flame|burn|ember/i, "fire"], [/cold|frost|ice|freez/i, "cold"],
+	[/lightning|storm|shock/i, "lightning"], [/thunder|sonic|roar/i, "thunder"], [/acid|corros/i, "acid"], [/necro|undead|death|grave|vampir/i, "necrotic"],
+	[/radiant|holy|divine|sacred/i, "radiant"], [/psychic|mind|dominat|charm/i, "psychic"],
+	[/aura|glow|light/i, "area"], [/vision|sight|sense|tremorsense|perception/i, "psychic"], [/resist|immun|armor|shield|hard|tough/i, "generic"],
+];
+export function traitKind(name) {
+	for (const [re, kind] of TRAIT_WORDS) if (re.test(name)) return kind;
+	return "generic";
 }
 
 /** What the weapon is: its group, else a word of its base type, name or the kind a magic item names ("Light blade", "Bow or crossbow"). */
@@ -239,13 +252,12 @@ const isItem = o => o && typeof o === "object" && !Array.isArray(o) && o._id && 
 
 /**
  * Gives an icon to every item the rules cover (powers, features, weapons, armour and worn items, consumables, loot, rituals) wherever it
- * is in the data (a list of documents, an entry with `items` or `powers`, anything nested), except the ones inside an actor: monsters,
- * traps and companions are left as they are. An entry's category, kind and type are passed down to its items. Returns how many it set.
+ * is in the data (a list of documents, an entry with `items` or `powers`, anything nested), the ones of monsters, traps and companions included;
+ * the actors themselves are left as they are. An entry's category, kind and type are passed down to its items. Returns how many it set.
  */
 export function decorate(data, ctx = {}) {
 	if (Array.isArray(data)) return data.reduce((n, x) => n + decorate(x, ctx), 0);
 	if (!data || typeof data !== "object") return 0;
-	if (data.system && typeof data.system === "object" && ACTORS.has(data.type)) return 0;
 	let count = 0;
 	if (isItem(data)) {
 		const img = iconForItem(data, ctx);
