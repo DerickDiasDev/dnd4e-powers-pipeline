@@ -143,3 +143,32 @@ describe("traits", () => {
 		assert.ok(ICON_CATALOG.has(iconForItem(feature({ featureType: "trait" }, "Regeneration"))));
 	});
 });
+
+describe("what does not belong in a fantasy game", () => {
+	test("no icon of a gun, a rocket, a bomb, tech or a damaged weapon is ever chosen", async () => {
+		const bad = /(^|[-/])(gun|guns|rifle|pistol|musket|rocket|laser|tech|grenade|bomb|cannon|drill|bullet|bullets|shells|damaged|broken)([-.]|$)/;
+		for (const [name, system] of [["Shortbow", { weaponType: "ranged" }], ["Ranged Thing", { weaponType: "ranged" }], ["Slash", { weaponType: "melee" }], ["Strike", {}]]) {
+			for (let i = 0; i < 40; i++) assert.ok(!bad.test(iconForItem(power(system, `${name} ${i}`))), `${name} ${i}`);
+		}
+		for (let i = 0; i < 40; i++) assert.ok(!bad.test(iconForItem({ _id: "c", name: `Arrows ${i}`, type: "consumable", system: { consumableType: "ammo" } })));
+	});
+	test("a ranged power is an arrow, a bow or a thrown blade, and a melee one is never a shield", () => {
+		for (let i = 0; i < 60; i++) {
+			assert.match(iconForItem(power({ weaponType: "ranged" }, `Volley ${i}`)), /arrow|bow|archery|dagger|dart|target-bullseye|shuriken|projectile-(spiral|strike)/);
+			assert.doesNotMatch(iconForItem(power({ weaponType: "melee" }, `Slash ${i}`)), /shield-/);
+		}
+	});
+});
+
+describe("powers named for a weapon or a natural attack", () => {
+	test("a weapon's name takes the weapon's art, a magic one ('... of ...') does not", async () => {
+		const { weaponNamed, naturalWeapon } = await import("../icons.mjs");
+		assert.deepEqual(["Shortbow", "Javelin", "Longsword", "Spear Charge", "Dagger Throw", "Sling"].map(weaponNamed), ["bows", "slings", "swords", "polearms", "bladeL", "slings"]);
+		assert.equal(weaponNamed("Dagger of Flame"), null);
+		assert.equal(weaponNamed("Burning Hands"), null);
+		assert.match(iconForItem(power({ damageType: { fire: true } }, "Shortbow")), /^icons\/weapons\/bows\//);
+		assert.match(iconForItem(power({ damageType: { fire: true } }, "Dagger of Flame")), /^icons\/magic\/fire\//);
+		assert.deepEqual(["Claw", "Claw Flurry", "Bite", "Slam", "Tail Slap", "Gore"].map(naturalWeapon), ["claws", "claws", "bites", "slams", "slams", "bites"]);
+		assert.match(iconForItem(power({}, "Claw")), /^icons\/creatures\/claws\//);
+	});
+});

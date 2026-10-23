@@ -16,9 +16,21 @@ import { fileURLToPath } from "node:url";
 const CATALOG = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "icons-catalog.json"), "utf8"));
 export const ICON_CATALOG = new Set(CATALOG);
 
-/** The catalog paths under the folders, when given, the ones whose file name matches `re`. */
+/**
+ * Words (the parts of a file name between dashes) of icons that do not belong in a fantasy game: guns, rockets, bombs, tech, tools of a
+ * workshop, a damaged weapon. The catalog has them (Foundry's icons are for every setting); the pools never use them.
+ */
+const NOT_FANTASY = new Set([
+	"gun", "guns", "rifle", "pistol", "musket", "blunderbuss", "rocket", "laser", "tech", "cyber", "robot", "grenade", "bomb", "cannon", "drill", "drilling",
+	"bullet", "bullets", "tracers", "missile", "jet", "battery", "plasma", "electronics", "circuit", "gramophone", "microphone", "megaphone", "loudspeaker",
+	"computer", "wrench", "screwdriver", "screw", "kevlar", "locomotive", "corkscrew", "welding", "goggles", "antenna", "turret", "shells", "shell",
+	"damaged", "broken", "chips",
+]);
+const notFantasy = file => file.slice(file.lastIndexOf("/") + 1).replace(/\.[a-z]+$/, "").split("-").some(part => NOT_FANTASY.has(part)) || /energy-weapon|blast-energy/.test(file);
+
+/** The catalog paths under the folders, when given, the ones whose file name matches `re`; never the ones that are not fantasy. */
 const pool = (folders, re = null) => {
-	const found = [].concat(folders).flatMap(folder => CATALOG.filter(p => p.startsWith(`icons/${folder}/`) && (!re || re.test(p.slice(p.lastIndexOf("/") + 1)))));
+	const found = [].concat(folders).flatMap(folder => CATALOG.filter(p => p.startsWith(`icons/${folder}/`) && !notFantasy(p) && (!re || re.test(p.slice(p.lastIndexOf("/") + 1)))));
 	if (!found.length) throw new Error(`no icons for ${folders}`);
 	return found;
 };
@@ -43,8 +55,8 @@ const POOLS = {
 	radiant: pool(["magic/holy", "magic/light"]),
 	psychic: pool("magic/perception"),
 	force: pool("magic/control", /force|telekin|impact|push|pull|repel|slow|hold|stun/),
-	melee: pool("skills/melee"),
-	ranged: pool("skills/ranged"),
+	melee: pool("skills/melee", /^(?!shield-)/),
+	ranged: pool("skills/ranged", /arrow|bow|archery|dagger|dart|target-bullseye|shuriken|projectile-(spiral|strike)/),
 	arcane: pool(["magic/symbols", "magic/control"]),
 	divine: pool(["magic/holy", "magic/light"]),
 	primal: pool("magic/nature"),
@@ -76,7 +88,7 @@ const POOLS = {
 	crossbows: pool("weapons/crossbows"),
 	slings: pool(["weapons/slings", "weapons/thrown"]),
 	whips: pool("weapons/misc"),
-	ammo: pool("weapons/ammunition"),
+	ammo: pool("weapons/ammunition", /arrow|bolt|quiver|dart|stone|sling|pellet/),
 	wands: pool("weapons/wands"),
 	rods: pool(["weapons/wands", "weapons/staves"], /rod|wand|scepter|sceptre|staff/),
 	orbs: pool("commodities/gems"),
@@ -108,6 +120,10 @@ const POOLS = {
 	gear: pool(["containers/bags", "tools/hand", "sundries/survival"]),
 	wondrous: pool(["commodities/gems", "sundries/misc"]),
 	ritual: pool(["sundries/scrolls", "sundries/books"]),
+	// the natural attacks of creatures
+	claws: pool("creatures/claws"),
+	bites: pool(["creatures/mammals", "creatures/reptiles", "creatures/unholy", "creatures/invertebrates"], /bite|fang|teeth|tooth|jaw|maw|snake|fangs/),
+	slams: pool(["creatures/claws", "creatures/tentacles", "skills/melee"], /hammer|slam|punch|fist|tentacle|claw|club|strike-club|horn|tail/),
 };
 
 /** The damage types, in the order the first one a power deals decides its icon. */
@@ -120,6 +136,9 @@ export function powerKind(item) {
 	const s = item.system ?? {};
 	const text = `${s.hit?.detail ?? ""} ${s.effect?.detail ?? ""}`;
 	if (!s.attack?.isAttack && !s.hit?.isDamage && HEALS.test(text)) return "healing";
+	// A power named for a weapon ("Shortbow", "Javelin", "Spear Charge") takes the weapon's own art; "Dagger of Flame" is a magic one.
+	const weapon = naturalWeapon(item.name) ?? weaponNamed(item.name);
+	if (weapon) return weapon;
 	for (const type of DAMAGE_ORDER) if (s.damageType?.[type]) return type;
 	if (s.weaponType === "melee" || s.weaponType === "meleeRanged") return "melee";
 	if (s.weaponType === "ranged") return "ranged";
@@ -175,6 +194,23 @@ const WEAPON_WORDS = [
 ];
 const WEAPON_GROUPS = { bladeH: "swords", bladeL: "bladeL", axe: "axes", ham: "hammers", mace: "maces", flail: "maces", spear: "polearms", pole: "polearms", pik: "polearms", staff: "staves", unarm: "fists", bow: "bows", cbow: "crossbows", sling: "slings", blowgun: "slings", garrote: "whips", whip: "whips" };
 const IMPLEMENTS = { holyS: "holySymbols", staff: "staves", rod: "rods", wand: "wands", orb: "orbs", totem: "staves", ki: "fists", tome: "tomes" };
+
+/** The weapon kind a power's name begins with, or null: its first two words are a weapon and it is not "... of ...". */
+export function weaponNamed(name) {
+	if (/\bof\b/i.test(name ?? "")) return null;
+	const start = String(name ?? "").replace(/["'‘’“”]/g, "").split(/\s+/).slice(0, 2).join(" ");
+	for (const [re, kind] of WEAPON_WORDS) if (re.test(start) && kind !== "ammo") return kind;
+	return null;
+}
+
+/** The natural attack a power's name begins with (a claw, a bite, a slam), or null: creatures have art for them. */
+export function naturalWeapon(name) {
+	const first = String(name ?? "").split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "");
+	if (/^(claw|claws|talon|talons|rake|rend|rending|swipe)$/.test(first)) return "claws";
+	if (/^(bite|bites|fang|fangs|maw|gore|sting|stinger|venomous)$/.test(first)) return "bites";
+	if (/^(slam|tail|horns?|trample|stomp|tentacle|tentacles|constrict|crush|pincer|pincers)$/.test(first)) return "slams";
+	return null;
+}
 
 /** The kind of icon for a weapon or an implement. */
 export function weaponKind(item, ctx = {}) {
