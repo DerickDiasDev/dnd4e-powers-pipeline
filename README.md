@@ -144,6 +144,12 @@ The system has a `Hazard` actor, and that is what a trap becomes (`out/db/trap/`
 
 One `ritual` item per page: `category` (the system's ritual types; Martial Practice is `martial`, Teleportation `travel`), `level`, `castTime` and `duration` in the sheet's time units (a time that is not a number of minutes, hours or days, such as "Standard action", is `spec` and kept in the text), `market` (the market price as printed), and `attribute` with the formula `@attribute`, so the sheet rolls the check of the first key skill. The description keeps what the sheet cannot show (the component cost, the other key skills, a time or duration with more words than a number and a unit), the text, the result tables, and for the alchemical rituals the pages of the item they make at each level. The first paragraph of the text is the chat description (the flavour at the top of the ritual's chat card) and is not repeated in the description, because the system's ritual card shows the description twice when there is no chat description. Notes: `skill-choice` (several key skills, the first is used), `skill-unknown`, `category-unknown`.
 
+## Icons
+
+Powers and features (feats, class and race features, paths, destinies, backgrounds, themes, deities and diseases) get one of Foundry's own core icons, so they no longer all show the same bag. `icons.mjs` chooses by what the item is: the damage a power deals, healing, the weapon, the power source or the way it is delivered; for a feature, its kind. Several icons fit each kind and the one used comes from the item's name, so an item always has the same icon and repeats are fine. `apply-icons.mjs` adds `img` to the built database (it is the last step of `npm run pipeline`, and `npm run icons` runs it alone). Monsters, traps, companions, gear and rituals are not given an icon yet.
+
+The icons are used by their path (`icons/magic/fire/...`), never copied: they are Foundry's, to be used inside Foundry. The paths to pick from are in `icons-catalog.json`, made from a Foundry install by `npm run icons:catalog`.
+
 ## Tests
 
 `npm test` runs without Foundry:
