@@ -16,7 +16,7 @@ const app = (argv.includes("--app") ? argv[argv.indexOf("--app") + 1] : process.
 const icons = path.join(app, "public", "icons");
 
 /** The folders of core icons the rules draw from. */
-export const CATALOG_FOLDERS = ["magic", "skills", "environment/people", "sundries/books", "sundries/documents", "sundries/flags", "sundries/misc"];
+export const CATALOG_FOLDERS = ["magic", "skills", "weapons", "equipment", "consumables", "containers", "tools", "commodities", "sundries", "creatures", "environment"];
 
 const walk = async dir => (await readdir(dir, { withFileTypes: true })).flatMap(e => (e.isDirectory() ? [] : [e.name])).concat(
 	...(await Promise.all((await readdir(dir, { withFileTypes: true })).filter(e => e.isDirectory()).map(async e => (await walk(path.join(dir, e.name))).map(n => `${e.name}/${n}`)))));

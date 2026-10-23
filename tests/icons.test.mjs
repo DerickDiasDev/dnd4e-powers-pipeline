@@ -4,7 +4,7 @@
  */
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { ICON_CATALOG, decorate, featureKind, hash, iconForItem, pick, powerKind } from "../icons.mjs";
+import { ICON_CATALOG, consumableKind, decorate, equipmentKind, featureKind, hash, iconForItem, lootKind, pick, powerKind, weaponKind } from "../icons.mjs";
 
 const power = (system = {}, name = "A Power") => ({ _id: "p1", name, type: "power", system: { damageType: {}, hit: {}, effect: {}, attack: {}, ...system } });
 const feature = (system = {}, name = "A Feature") => ({ _id: "f1", name, type: "feature", system });
@@ -52,9 +52,58 @@ describe("the icon", () => {
 		for (const system of [{ powersource: "arcane" }, { powersource: "divine" }, { powersource: "primal" }, { powersource: "psionic" }, { powersource: "shadow" }, { powersource: "Elemental" }, { weaponType: "ranged" }, {}]) assert.ok(ICON_CATALOG.has(iconForItem(power(system))), JSON.stringify(system));
 		for (const featureType of ["feat", "path", "destiny", "background", "theme", "class", "race", "trait", "other"]) assert.ok(ICON_CATALOG.has(iconForItem(feature({ featureType }))), featureType);
 	});
-	test("gear, rituals and anything else get none", () => {
-		assert.equal(iconForItem({ _id: "x", name: "Sword", type: "weapon", system: {} }), null);
-		assert.equal(iconForItem({ _id: "x", name: "Alarm", type: "ritual", system: {} }), null);
+	test("an item that is not covered gets none", () => {
+		assert.equal(iconForItem({ _id: "x", name: "Thing", type: "tool", system: {} }), null);
+	});
+});
+
+const weapon = (system, name = "Blade") => ({ _id: "w", name, type: "weapon", system });
+const worn = (armour, extra = {}, name = "Thing") => ({ _id: "e", name, type: "equipment", system: { armour, ...extra } });
+
+describe("weapons and implements", () => {
+	test("by group first, then by a word of the base type, the name or the kind a magic item names", () => {
+		assert.equal(weaponKind(weapon({ weaponType: "militaryM", weaponBaseType: "longsword", weaponGroup: { bladeH: true } })), "swords");
+		assert.equal(weaponKind(weapon({ weaponType: "simpleM", weaponBaseType: "dagger", weaponGroup: { bladeL: true } })), "bladeL");
+		assert.equal(weaponKind(weapon({ weaponType: "militaryR", weaponBaseType: "longbow", weaponGroup: { bow: true } })), "bows");
+		assert.equal(weaponKind(weapon({ weaponType: "simpleR", weaponGroup: { cbow: true } })), "crossbows");
+		assert.equal(weaponKind(weapon({ weaponType: "militaryM", weaponBaseType: "greataxe" }, "Axe of the Dwarvish Lords"), { type: "Greataxe" }), "axes");
+		assert.equal(weaponKind(weapon({}, "Frost Brand"), { type: "Light blade" }), "bladeL");
+		assert.equal(weaponKind(weapon({ weaponType: "militaryM" }, "Mystery")), "swords");
+		assert.equal(weaponKind(weapon({ weaponType: "militaryR" }, "Mystery")), "bows");
+	});
+	test("an implement by its kind", () => {
+		for (const [weaponBaseType, kind] of [["holyS", "holySymbols"], ["staff", "staves"], ["rod", "rods"], ["wand", "wands"], ["orb", "orbs"], ["totem", "staves"], ["ki", "fists"], ["tome", "tomes"]]) assert.equal(weaponKind(weapon({ weaponType: "implement", weaponBaseType })), kind, weaponBaseType);
+	});
+});
+
+describe("armour, worn items, consumables and loot", () => {
+	test("armour by its kind, shields apart from bracers, worn items by their slot", () => {
+		assert.equal(equipmentKind(worn({ type: "armour", subtype: "heavy" }, { armourBaseType: "plate" })), "plateArmor");
+		assert.equal(equipmentKind(worn({ type: "armour", subtype: "light" }, { armourBaseType: "hide" })), "leatherArmor");
+		assert.equal(equipmentKind(worn({ type: "armour", subtype: "light" }, { armourBaseType: "cloth" })), "clothArmor");
+		assert.equal(equipmentKind(worn({ type: "arms", subtype: "heavy" }, { shieldBaseType: "heavy" })), "shields");
+		assert.equal(equipmentKind(worn({ type: "arms", subtype: "" })), "wrists");
+		assert.deepEqual(["head", "neck", "ring", "feet", "hands", "waist", "alternative", "other"].map(type => equipmentKind(worn({ type }))), ["head", "neck", "ring", "feet", "hands", "waist", "boon", "cloaks"]);
+	});
+	test("consumables: ammunition, poison, scrolls, food, potions", () => {
+		const c = (consumableType, name = "Thing") => ({ name, system: { consumableType } });
+		assert.deepEqual([c("ammo"), c("poison"), c("other", "Scroll of Fire"), c("other", "Travel Ration"), c("alchemical", "Acid")].map(consumableKind), ["ammo", "poisons", "scrolls", "food", "potions"]);
+	});
+	test("loot: gear, mounts, instruments, banners, tattoos, lair and wondrous items", () => {
+		assert.equal(lootKind({ name: "Rope" }, { kind: "item", category: "gear" }), "gear");
+		assert.equal(lootKind({ name: "Warhorse" }, { kind: "mount" }), "mounts");
+		assert.equal(lootKind({ name: "Lute" }, { kind: "item" }), "instruments");
+		assert.equal(lootKind({ name: "Battle Standard" }, { category: "Wondrous" }), "banners");
+		assert.equal(lootKind({ name: "Tattoo of Might" }, { category: "Wondrous" }), "tattoos");
+		assert.equal(lootKind({ name: "Hoard" }, { category: "Lair" }), "treasure");
+		assert.equal(lootKind({ name: "Bag of Tricks" }, { category: "Wondrous" }), "wondrous");
+	});
+	test("rituals get a scroll or a book", () => {
+		const icon = iconForItem({ _id: "r", name: "Alarm", type: "ritual", system: {} });
+		assert.ok(ICON_CATALOG.has(icon) && /sundries\/(scrolls|books)\//.test(icon));
+	});
+	test("every kind of equipment has icons in the catalog", () => {
+		for (const item of [weapon({ weaponType: "implement", weaponBaseType: "holyS" }), worn({ type: "head" }), worn({ type: "arms", subtype: "light" }), { _id: "c", name: "Elixir", type: "consumable", system: { consumableType: "other" } }, { _id: "l", name: "Rope", type: "loot", system: {} }]) assert.ok(ICON_CATALOG.has(iconForItem(item)), item.type);
 	});
 });
 
@@ -72,6 +121,11 @@ describe("decorate", () => {
 		assert.equal(actor.img, undefined);
 		assert.equal(actor.items[0].img, undefined);
 		assert.equal(effect.img, "icons/svg/net.svg");
+	});
+	test("an entry's category and kind reach its items", () => {
+		const entry = { _id: "g", name: "Warhorse", kind: "mount", category: "mount", items: [{ _id: "i", name: "Warhorse", type: "loot", system: {} }] };
+		decorate([entry]);
+		assert.ok(entry.items[0].img.startsWith("icons/creatures/mammals/"));
 	});
 	test("again changes nothing", () => {
 		const data = [power({ damageType: { acid: true } }, "Acid")];
