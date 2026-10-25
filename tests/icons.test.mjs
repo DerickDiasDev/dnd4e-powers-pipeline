@@ -90,7 +90,8 @@ describe("armour, worn items, consumables and loot", () => {
 		assert.deepEqual([c("ammo"), c("poison"), c("other", "Scroll of Fire"), c("other", "Travel Ration"), c("alchemical", "Acid")].map(consumableKind), ["ammo", "poisons", "scrolls", "food", "potions"]);
 	});
 	test("loot: gear, mounts, instruments, banners, tattoos, lair and wondrous items", () => {
-		assert.equal(lootKind({ name: "Rope" }, { kind: "item", category: "gear" }), "gear");
+		assert.equal(lootKind({ name: "Crowbar" }, { kind: "item", category: "gear" }), "gear");
+		assert.equal(lootKind({ name: "Rope" }, { kind: "item", category: "gear" }), "rope");
 		assert.equal(lootKind({ name: "Warhorse" }, { kind: "mount" }), "mounts");
 		assert.equal(lootKind({ name: "Lute" }, { kind: "item" }), "instruments");
 		assert.equal(lootKind({ name: "Battle Standard" }, { category: "Wondrous" }), "banners");
@@ -182,5 +183,20 @@ describe("breath weapons", () => {
 		assert.match(iconForItem(power({ damageType: { acid: true } }, "Breath Weapon")), /^icons\/magic\/acid\//);
 		assert.match(iconForItem(power({}, "Breath of the Grave")), /dragon-breath/);
 		assert.doesNotMatch(iconForItem(power({}, "Breathe Mosquitoes")), /dragon-breath/);
+	});
+});
+
+describe("adventuring gear with an icon of its own", () => {
+	test("rations are a ration, a waterskin a waterskin; a bedroll, a pack, a pouch, a fire lighter, a sunrod and rope have theirs", () => {
+		const loot = name => iconForItem({ _id: "l", name, type: "loot", system: {} });
+		assert.equal(loot("Trail Rations"), "icons/consumables/grains/breadsticks-crackers-wrapped-ration-brown.webp");
+		assert.equal(loot("Waterskin"), "icons/sundries/survival/waterskin-leather-brown.webp");
+		assert.match(loot("Bedroll"), /^icons\/sundries\/survival\/bedroll-/);
+		assert.match(loot("Backpack (empty)"), /^icons\/containers\/bags\/pack-leather/);
+		assert.match(loot("Belt Pouch (empty)"), /^icons\/containers\/bags\/pouch-leather/);
+		assert.match(loot("Flint and Steel"), /^icons\/sundries\/survival\/fire-lighter/);
+		assert.match(loot("Sunrod"), /^icons\/magic\/light\/torch-fire/);
+		assert.match(loot("Hempen Rope (50 ft.)"), /^icons\/sundries\/survival\/rope-/);
+		assert.doesNotMatch(loot("Operation Iterations"), /ration/, "a whole word");
 	});
 });

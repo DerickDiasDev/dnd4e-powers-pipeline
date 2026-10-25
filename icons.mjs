@@ -118,6 +118,15 @@ const POOLS = {
 	treasure: pool("commodities/treasure"),
 	buildings: pool("environment/settlement"),
 	gear: pool(["containers/bags", "tools/hand", "sundries/survival"]),
+	// adventuring gear that has an icon of its own
+	rations: pool("consumables/grains", /ration/),
+	waterskin: pool("sundries/survival", /^waterskin/),
+	bedroll: pool("sundries/survival", /^bedroll/),
+	backpack: pool("containers/bags", /^pack-leather/),
+	beltPouch: pool("containers/bags", /^pouch-leather/),
+	firelighter: pool("sundries/survival", /^fire-lighter/),
+	sunrod: pool("magic/light", /^torch-fire/),
+	rope: pool("sundries/survival", /^rope-(brown|coil|coiled)/),
 	wondrous: pool(["commodities/gems", "sundries/misc"]),
 	ritual: pool(["sundries/scrolls", "sundries/books"]),
 	// breaths
@@ -269,8 +278,15 @@ export function consumableKind(item) {
 	return "potions";
 }
 
+const GEAR_NAMES = [
+	[/\brations?\b/i, "rations"], [/\bwaterskin\b/i, "waterskin"], [/\bbedroll\b/i, "bedroll"], [/\bbackpack\b/i, "backpack"], [/\bbelt pouch\b/i, "beltPouch"],
+	[/\bflint\b/i, "firelighter"], [/\bsunrod\b/i, "sunrod"], [/\brope\b/i, "rope"],
+];
+
 /** The kind of icon for loot: gear, a mount, an instrument, a wondrous item. */
 export function lootKind(item, ctx = {}) {
+	// What the adventurer carries has its own art: rations, a waterskin, a bedroll, a pack, a pouch, a fire lighter, a sunrod, rope.
+	for (const [re, kind] of GEAR_NAMES) if (re.test(item.name ?? "")) return kind;
 	const text = `${item.name} ${ctx.type ?? ""} ${ctx.subtype ?? ""}`;
 	if (ctx.kind === "mount" || ctx.category === "Mount" || /\bmount\b/i.test(ctx.type ?? "")) return "mounts";
 	if (ctx.kind === "building") return "buildings";
