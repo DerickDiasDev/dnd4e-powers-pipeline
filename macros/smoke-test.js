@@ -521,10 +521,11 @@ await run("M builder", "a first-level human knight: the scores, the racial bonus
 	const raceEntry = (await get("race/races.json")).find(e => e._id === raceRow._id);
 	const classRow = (await get("class/_index.json")).find(r => r.name === "Fighter (Knight)");
 	const classEntry = (await get("class/classes.json")).find(e => e._id === classRow._id);
-	const draft = { ...builderModule.newDraft(1), race: raceRow.id, raceAbility: "str", class: classRow.id, base: { str: 16, con: 14, dex: 11, int: 8, wis: 12, cha: 8 }, skills: ["ath", "end", "hea"] };
-	eq("M builder", "the point buy of 22 points allows these scores (10 + 6 + 3 + 0 + 4 + 0 = 23 is too many; with Dex 10 it is 22)", [builderModule.pointCost(draft.base), builderModule.validBase(draft.base, "pointbuy")], [23, false]);
-	draft.base.dex = 10;
-	eq("M builder", "with Dex 10 it is exactly 22 points", [builderModule.pointCost(draft.base), builderModule.validBase(draft.base, "pointbuy")], [22, true]);
+	const draft = { ...builderModule.newDraft(1), race: raceRow.id, raceAbility: "str", class: classRow.id, base: { str: 16, con: 14, dex: 15, int: 8, wis: 13, cha: 10 }, skills: ["ath", "end", "hea"] };
+	eq("M builder", "the custom scores of the book (start 8, 10x5, 22 points; 16 = 9, 14 = 5, 15 = 7, 13 = 3) allow these scores: 9 + 5 + 7 + 0 + 3 + 0 = 24 is too many", [builderModule.pointCost(draft.base), builderModule.validBase(draft.base, "pointbuy")], [24, false]);
+	draft.base.dex = 14;
+	eq("M builder", "with Dex 14 (5 points) it is exactly 22", [builderModule.pointCost(draft.base), builderModule.validBase(draft.base, "pointbuy")], [22, true]);
+	eq("M builder", "two scores below 10 are not allowed", builderModule.validBase({ ...draft.base, cha: 9 }, "pointbuy"), false);
 	const update = builderApply.sheetUpdate(draft, raceEntry);
 	const plain = make(pc());
 	const built = patched(pc(), { ...update, ...classModule.classPatch(make(pc({ abilities: { con: { value: 14 } } })).system, classEntry.apply).update });
