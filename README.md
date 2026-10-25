@@ -163,6 +163,12 @@ npm run tokens           # downloads the matched tokens (about 600 files, 100 MB
 
 The images are art of the books and are not part of this project: they are downloaded to your Foundry data folder (`--to <dir>` or `DND4E_TOKENS_TO` for another one, and then the path in the actors has to match), never to a repository. Without the list, `apply-tokens.mjs` changes nothing; an actor whose file is not downloaded shows a missing image.
 
+## Class powers and class choices
+
+Some powers a class gives are spelled out only on the class page, not in the power catalog: Hunter's Quarry, Warlock's Curse, the arcanist's implement powers, the cavalier's celestial steed. `collect-class-powers.mjs` (the first step of `npm run pipeline`) reads those blocks from `out/class.json` and adds them to `out/power.json` as powers of the class, so they are parsed and built like the rest and the class feature that names them hands them out (a ranger gets Hunter's Quarry with the class). It only adds a block the catalog has no power of that name for, leaves out the "... Secondary Power" parts and the copies of hybrid classes, and changes nothing when run again.
+
+Some class features make you choose: a ranger's fighting style, a barbarian's heartland, a fighter's talents. `class-choices.mjs` reads such a feature (a first sentence that says to choose and at least two options under headings) into `choices: [{section, feature, level, pick, options: [{name, text}]}]` on the class entry (`section` is the feature's place in the entry's items), so the importer's builder can offer the options and import the one picked instead of the whole list. 17 classes have one.
+
 ## Tests
 
 `npm test` runs without Foundry:

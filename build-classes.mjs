@@ -21,6 +21,7 @@ import { ENUMS } from "./system-enums.mjs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseChoice } from "./class-choices.mjs";
 
 export const CLASS_SCHEMA_VERSION = 1;
 
@@ -131,6 +132,13 @@ export function buildClass(cls, powerRows = []) {
 		}
 	}
 
+	// The features that make you choose (a fighting style, a heartland...): each option, to pick one in the builder and to import the one picked.
+	const choices = [];
+	cls.features.forEach((feature, i) => {
+		const choice = parseChoice(feature.text);
+		if (choice) choices.push({ section: i, feature: featureTitle(feature.name, feature.level), level: feature.level, pick: choice.pick, options: choice.options });
+	});
+
 	const apply = {
 		class: cls.baseName === cls.name || !cls.build ? cls.name : cls.name,
 		primaryAbility: cls.hybrid ? null : (cls.keyAbilities[0] ?? null),
@@ -150,11 +158,12 @@ export function buildClass(cls, powerRows = []) {
 	if (cls.trainedSkills.choose) notes.push("skill-choice");
 	if (cls.weapons.other.length) notes.push("weapons-custom");
 	if (powers.some(p => p.kind === "option")) notes.push("power-choice");
+	if (choices.length) notes.push("feature-choice");
 	if (unresolved.length) notes.push("powers-unresolved");
 	return {
 		id: cls.id, _id: main._id, name: cls.name, baseName: cls.baseName, build: cls.build, hybrid: cls.hybrid, sources: cls.sources, source: cls.sourceCode,
 		role: cls.role, powerSource: cls.powerSource, keyAbilities: cls.keyAbilities, quality: cls.quality, notes,
-		skillChoice: { choose: cls.trainedSkills.choose, from: cls.classSkills }, apply, powers, unresolved, items,
+		skillChoice: { choose: cls.trainedSkills.choose, from: cls.classSkills }, apply, powers, unresolved, choices, items,
 	};
 }
 
