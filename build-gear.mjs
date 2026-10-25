@@ -247,6 +247,8 @@ export function summaryOf(main) {
 		return {
 			damage: part ? `${part.numDice}d${part.numFaces}` : null, proficiency: s.profBonus || null,
 			range: s.range ? [s.range.value, s.range.long] : null, hand: s.weaponHand, group: Object.keys(s.weaponGroup ?? {})[0] ?? null,
+			// the properties the weapon has (versatile, reach, high crit, heavy thrown...), for the importer's list
+			properties: Object.keys(s.properties ?? {}).filter(k => s.properties[k] && k !== "imp"),
 		};
 	}
 	if (main.type === "equipment") {

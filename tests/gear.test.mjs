@@ -136,7 +136,7 @@ describe("building", () => {
 
 	test("the index row carries the numbers the list shows, so the list needs no data file", () => {
 		const [e] = build(w("Longsword"));
-		assert.deepEqual(indexRow(e).summary, { damage: "1d8", proficiency: 3, range: null, hand: "hMain", group: "bladeH" });
+		assert.deepEqual(indexRow(e).summary, { damage: "1d8", proficiency: 3, range: null, hand: "hMain", group: "bladeH", properties: ["ver"] });
 		const mail = parseArmor(entry("Zorb mail", `<h1 class=player>Zorb mail</h1><br><b>AC Bonus</b>: +6<br><b>Check</b>: -1<br><b>Weight</b>: 40 lb.<br><b>Cost</b>: 40 gp.<br><b>Type</b>: Chainmail<br>${published}`, { Type: "Chainmail" }));
 		assert.deepEqual(indexRow(build(mail)[0]).summary, { bonus: 6, check: -1, speed: null });
 	});
