@@ -318,7 +318,9 @@ describe("real database bonuses", { skip }, () => {
 			for (const e of JSON.parse(await readFile(path.join(dbDir, file), "utf8"))) for (const item of e.items) {
 				// The prerequisite ("11th level") is not part of what the effect was built from.
 				const text = item.system.description.value.replace(/<p><strong>Prerequisite:<\/strong>[^<]*<\/p>/, "");
-				if (item.effects?.length && CHOICE.test(text)) bad.push(`${e.name}: ${item.name}`);
+				// Training and proficiencies are read sentence by sentence and do not depend on the rest of the text.
+				const bonuses = (item.effects ?? []).filter(fx => fx.system.changes.some(c => !/\.training$|Prof\.value$/.test(c.key)));
+				if (bonuses.length && CHOICE.test(text)) bad.push(`${e.name}: ${item.name}`);
 			}
 		}
 		assert.deepEqual(bad.slice(0, 5), []);

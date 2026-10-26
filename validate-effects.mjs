@@ -9,7 +9,16 @@ const ICONS = new Set(Object.values(STATUS_IMG));
 const PLAIN = "feat|item|power|race|untyped";
 const alt = list => list.join("|");
 /** The keys a change may have, each tied to a field the sheet or the roll code reads (checked against the installed system). */
+// Training (the floor of a skill's training: 5 is trained) and the proficiencies, which are sets: a change adds the value to the set.
+const TRAINING = new RegExp(String.raw`^system\.skills\.(?:${alt(ENUMS.skills)})\.training$`);
+const PROFICIENCY = {
+	"system.details.armourProf.value": new Set(ENUMS.armourProf),
+	"system.details.weaponProf.value": null, // a base type of a weapon: the names are the builder's to match against the system's
+	"system.details.implementProf.value": new Set(ENUMS.implementProf),
+};
 const KEYS = [
+	TRAINING,
+	new RegExp(String.raw`^system\.details\.(?:armour|weapon|implement)Prof\.value$`),
 	new RegExp(String.raw`^system\.defences\.(?:${alt(ENUMS.defences)})\.(?:${PLAIN}|shield|enhance|class)$`),
 	new RegExp(String.raw`^system\.movement\.base\.(?:${PLAIN})$`),
 	new RegExp(String.raw`^system\.details\.(?:saves|deathsavebon)\.(?:${PLAIN})$`),
@@ -24,6 +33,8 @@ const TYPES = ["add", "upgrade", "downgrade"];
 
 /** The change type the stacking rules need: untyped bonuses add up, typed ones take the highest, resistances the highest (vulnerabilities the lowest). */
 function expectedType(key) {
+	if (key in PROFICIENCY) return "add";
+	if (TRAINING.test(key)) return "upgrade";
 	if (/\.(?:res)$/.test(key)) return "upgrade";
 	if (/\.(?:vuln)$/.test(key)) return "downgrade";
 	if (key.startsWith("power.")) return "add";
@@ -58,7 +69,10 @@ export function effectProblems(item, seenIds = new Set()) {
 			if (!KEYS.some(re => re.test(c.key))) problems.push(`change key "${c.key}" is not a field the sheet or the roll code reads`);
 			if (!TYPES.includes(c.type)) problems.push(`change type "${c.type}" is not one of ${TYPES.join("/")}`);
 			else if (KEYS.some(re => re.test(c.key)) && c.type !== expectedType(c.key)) problems.push(`change on "${c.key}" should be "${expectedType(c.key)}", not "${c.type}" (stacking rules)`);
-			if (!/^-?\d+$/.test(String(c.value))) problems.push(`change value "${c.value}" is not a whole number`);
+			if (c.key in PROFICIENCY) {
+				if (PROFICIENCY[c.key] && !PROFICIENCY[c.key].has(c.value)) problems.push(`change value "${c.value}" is not one the system has for ${c.key}`);
+				else if (!/^[A-Za-z]+$/.test(String(c.value))) problems.push(`change value "${c.value}" is not a proficiency key`);
+			} else if (!/^-?\d+$/.test(String(c.value))) problems.push(`change value "${c.value}" is not a whole number`);
 			if (c.key.endsWith(".vuln") && Number(c.value) > 0) problems.push("a vulnerability must be negative");
 		}
 		if (!(e.statuses?.length || sys.dots?.length || sys.changes?.length)) problems.push("an effect that does nothing (no status, dot or change)");

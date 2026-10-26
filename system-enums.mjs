@@ -70,6 +70,7 @@ export const ENUMS = {
 	weaponProperties: keysOf("weaponProperties"),
 	weaponGroups: keysOf("weaponGroup"),
 	implements: keysOf("implement"),
+	implementProf: keysOf("implementProficiencies"),
 	equipmentTypes: keysOf("equipmentTypes"),
 	equipmentTypesArmour: keysOf("equipmentTypesArmour"),
 	equipmentTypesAlt: keysOf("equipmentTypesAlt"),
@@ -103,3 +104,9 @@ export const STATUS_IMG = (() => {
 
 /** lowercase label -> key of a `DND4E.<name>` table whose values are lang keys ("Longsword" -> "longsword" for militaryM). */
 export const labelMap = name => new Map(entriesOf(name).map(([k, raw]) => [(labelOf(raw) ?? k).toLowerCase(), k]));
+
+/** Lower-case skill name -> skill key ("arcana" -> "arc"), from the system's own labels. */
+export const SKILL_BY_NAME = new Map(ENUMS.skills.flatMap(key => {
+	const label = flatLang[`DND4E.Skill${key[0].toUpperCase()}${key.slice(1)}`];
+	return label ? [[label.toLowerCase(), key]] : [];
+}));

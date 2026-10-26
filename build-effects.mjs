@@ -11,6 +11,8 @@
  */
 import { createHash } from "node:crypto";
 import { parseBonuses, parseResistances } from "./parse-bonuses.mjs";
+import { parseProficiencies } from "./parse-proficiency.mjs";
+import { SKILL_BY_NAME, labelMap } from "./system-enums.mjs";
 
 export const EFFECT_SCHEMA = 2;
 
@@ -145,9 +147,42 @@ export function featureEffects(text, { itemId, damageTypes }) {
 		}));
 }
 
+let proficiencyNames = null;
+/** The skills and weapons the system has, by lower-case name (the plural of a weapon's name too is found: see parse-proficiency.mjs). */
+function proficiencyLookups() {
+	if (proficiencyNames) return proficiencyNames;
+	const weapons = new Map();
+	for (const category of ["simpleM", "simpleR", "militaryM", "militaryR", "superiorM", "superiorR"]) {
+		for (const [name, key] of labelMap(category)) {
+			weapons.set(name, key);
+			weapons.set(name.replace(/ /g, ""), key);
+			weapons.set(name.replace(/ies$/, "y").replace(/(?<!s)s$/, ""), key);
+		}
+	}
+	return (proficiencyNames = { skills: SKILL_BY_NAME, weapons });
+}
+
+/**
+ * The training and proficiencies a feature gives ("You gain training in Arcana.") as one effect that transfers to the owner. The ones the
+ * text leaves to a choice are not built (parse-proficiency.mjs).
+ * @returns {object[]} zero or one effect
+ */
+export function proficiencyEffects(text, { itemId }) {
+	const { changes, names } = parseProficiencies(text, proficiencyLookups());
+	if (!changes.length) return [];
+	return [{
+		_id: stableId(`${itemId}:proficiency`),
+		name: names.join(", "),
+		transfer: true,
+		statuses: [],
+		system: { changes, durationType: "", powerEffectType: "misc", dots: [], keywords: [] },
+		flags: { dnd4e: { import: { generated: EFFECT_SCHEMA } } },
+	}];
+}
+
 /** Sets `effects` on a feature item from its text, and counts them in the import flags. */
 export function attachFeatureEffects(item, text, damageTypes) {
-	item.effects = featureEffects(text, { itemId: item._id, damageTypes });
+	item.effects = [...featureEffects(text, { itemId: item._id, damageTypes }), ...proficiencyEffects(text, { itemId: item._id })];
 	if (item.effects.length) item.flags.dnd4e.import.effects = item.effects.length;
 	return item;
 }
