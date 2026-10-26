@@ -237,6 +237,20 @@ export function naturalWeapon(name) {
 	return null;
 }
 
+/**
+ * The icons made for the very weapon a name says (a scimitar, a shortsword, a greatsword, a dagger): the files of Foundry's weapon folders
+ * named for it. A name with none of these words, or a weapon Foundry has no art for (a longsword, a rapier), has none: the weapon's kind decides.
+ */
+export function namedWeaponIcons(name) {
+	const words = new Set(String(name ?? "").toLowerCase().split(/[^a-z]+/));
+	for (const word of ["scimitar", "shortsword", "greatsword", "dagger"]) {
+		if (!words.has(word) && !words.has(`${word}s`)) continue;
+		const found = CATALOG.filter(p => p.startsWith("icons/weapons/") && !notFantasy(p) && new RegExp(`/${word}(-[^/]*)?\\.[a-z]+$`).test(p));
+		if (found.length) return found;
+	}
+	return null;
+}
+
 /** The kind of icon for a weapon or an implement. */
 export function weaponKind(item, ctx = {}) {
 	const s = item.system ?? {};
@@ -306,7 +320,7 @@ export function iconForItem(item, ctx = {}) {
 	switch (item?.type) {
 		case "power": return pick(POOLS[powerKind(item)], item.name);
 		case "feature": return pick(POOLS[featureKind(item)], item.name);
-		case "weapon": return pick(POOLS[weaponKind(item, ctx)], item.name);
+		case "weapon": return pick((item.system?.weaponType === "implement" ? null : namedWeaponIcons(item.name)) ?? POOLS[weaponKind(item, ctx)], item.name);
 		case "equipment": return pick(POOLS[equipmentKind(item, ctx)], item.name);
 		case "consumable": return pick(POOLS[consumableKind(item)], item.name);
 		case "loot": return pick(POOLS[lootKind(item, ctx)], item.name);

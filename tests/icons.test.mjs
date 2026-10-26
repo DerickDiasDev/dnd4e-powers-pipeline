@@ -200,3 +200,14 @@ describe("adventuring gear with an icon of its own", () => {
 		assert.doesNotMatch(loot("Operation Iterations"), /ration/, "a whole word");
 	});
 });
+
+describe("icons made for the weapon a name says", () => {
+	test("a scimitar gets a scimitar, a shortsword a shortsword; others keep their kind's icons", () => {
+		const weapon = (name, system = {}) => ({ _id: "w", name, type: "weapon", system });
+		assert.match(iconForItem(weapon("Scimitar", { weaponGroup: { bladeL: true } })), /weapons\/swords\/scimitar(-|\.)/);
+		assert.match(iconForItem(weapon("Flaming Scimitar +2")), /\/scimitar(-|\.)/);
+		assert.match(iconForItem(weapon("Shortsword")), /\/shortsword(-|\.)/);
+		assert.match(iconForItem(weapon("Dagger", { weaponGroup: { bladeL: true } })), /\/dagger(-|\.)/);
+		assert.doesNotMatch(iconForItem(weapon("Longsword", { weaponGroup: { bladeH: true } })), /sword-cane/);
+	});
+});
